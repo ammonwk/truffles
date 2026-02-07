@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="64" viewBox="0 0 360 64" fill="none">
+  <rect x="8" y="10" width="44" height="44" rx="11" fill="#78350f" fill-opacity="0.10"/>
+  <rect x="8.5" y="10.5" width="43" height="43" rx="10.5" stroke="#b45309" stroke-opacity="0.30"/>
+  <g transform="translate(14 14)">
+    <path d="M17.9 2.8c5-.6 9.4 1.3 12.3 5 3.3 4.1 3 10.3-.5 14.4-3.5 4.1-9.3 6-14.8 5.3-5.1-.7-9.3-3.3-11.5-7.5-2.2-4.5-1.5-10 1.8-13.6 3.1-3.3 7.9-5.3 12.7-4.7Z" fill="#c4956a"/>
+    <path d="M11.2 11.6c2-.9 4.4-1.3 6.7-1" stroke="#8f6747" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M15.7 18.3c2.2-.6 4.3-.2 6.2.8" stroke="#8f6747" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="13.6" cy="15.2" r="1.1" fill="#8f6747"/>
+    <path d="m29.2 2 1.1 2.4 2.4 1-2.4 1-1.1 2.4-1-2.4-2.4-1 2.4-1 1-2.4Z" fill="#f59e0b"/>
+  </g>
+  <text x="64" y="30" fill="#e2e8f0" font-family="'IBM Plex Sans', 'Segoe UI', sans-serif" font-size="20" font-weight="600" letter-spacing="-0.01em">Truffles</text>
+  <text x="64" y="45" fill="#94a3b8" font-family="'IBM Plex Sans', 'Segoe UI', sans-serif" font-size="10.5" font-weight="500" letter-spacing="0.2em">POSTHOG TO PR</text>
+</svg>

@@ -1,0 +1,394 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b1218;
+  --text-main: #e2e8f0;
+  --input-bg: rgba(15, 23, 42, 0.82);
+  --input-border: rgba(100, 116, 139, 0.45);
+  --button-bg: rgba(15, 23, 42, 0.82);
+  --button-hover-bg: rgba(22, 34, 49, 0.92);
+  --button-border: rgba(100, 116, 139, 0.45);
+  --button-accent-bg: rgba(245, 158, 11, 0.16);
+  --button-accent-border: rgba(245, 158, 11, 0.45);
+}
+
+:root[data-theme='light'] {
+  --bg: #f3f6f8;
+  --text-main: #0f172a;
+  --input-bg: #ffffff;
+  --input-border: #c5d2dc;
+  --button-bg: #ffffff;
+  --button-hover-bg: #f1f6fa;
+  --button-border: #c5d2dc;
+  --button-accent-bg: rgba(217, 119, 6, 0.11);
+  --button-accent-border: rgba(217, 119, 6, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-main);
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+::selection {
+  background: rgba(245, 158, 11, 0.35);
+  color: #f8fafc;
+}
+
+.mono {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+.input-surface {
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-main);
+  padding: 0.52rem 0.65rem;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.input-surface:focus {
+  border-color: rgba(245, 158, 11, 0.58);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.button-surface {
+  border-radius: 0.6rem;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--text-main);
+  font-size: 0.78rem;
+  line-height: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.54rem 0.76rem;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.button-surface:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: var(--button-hover-bg);
+}
+
+.button-accent {
+  border-color: var(--button-accent-border);
+  background: var(--button-accent-bg);
+  color: #fef3c7;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 0.2rem 0.56rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.chip-red {
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.chip-yellow {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.chip-amber {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.chip-grey {
+  color: #d1d5db;
+  border-color: rgba(148, 163, 184, 0.4);
+  background: rgba(71, 85, 105, 0.2);
+}
+
+.animate-rise {
+  animation: rise 0.24s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Light theme utility remaps for Tailwind classes used in App.tsx */
+:root[data-theme='light'] .bg-slate-950 {
+  background-color: #f3f6f8 !important;
+}
+
+:root[data-theme='light'] .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+
+:root[data-theme='light'] .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+:root[data-theme='light'] .bg-slate-900\/85,
+:root[data-theme='light'] .bg-slate-900\/70,
+:root[data-theme='light'] .bg-slate-900\/65 {
+  background-color: #ffffff !important;
+}
+
+:root[data-theme='light'] .bg-slate-800 {
+  background-color: #e6edf4 !important;
+}
+
+:root[data-theme='light'] .bg-slate-800\/60 {
+  background-color: rgba(230, 237, 244, 0.85) !important;
+}
+
+:root[data-theme='light'] .bg-slate-950\/70,
+:root[data-theme='light'] .bg-slate-950\/85,
+:root[data-theme='light'] .bg-\[\#02060f\] {
+  background-color: #edf3f8 !important;
+}
+
+:root[data-theme='light'] .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+:root[data-theme='light'] .hover\:bg-white\/5:hover {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+:root[data-theme='light'] .text-white {
+  color: #0f172a !important;
+}
+
+:root[data-theme='light'] .text-slate-100 {
+  color: #111827 !important;
+}
+
+:root[data-theme='light'] .text-slate-200 {
+  color: #1e293b !important;
+}
+
+:root[data-theme='light'] .text-slate-300 {
+  color: #334155 !important;
+}
+
+:root[data-theme='light'] .text-slate-400 {
+  color: #475569 !important;
+}
+
+:root[data-theme='light'] .text-slate-500 {
+  color: #64748b !important;
+}
+
+:root[data-theme='light'] .border-slate-700\/80,
+:root[data-theme='light'] .border-slate-700\/70,
+:root[data-theme='light'] .border-white\/15,
+:root[data-theme='light'] .border-white\/10,
+:root[data-theme='light'] .border-white\/5 {
+  border-color: rgba(148, 163, 184, 0.4) !important;
+}
+
+:root[data-theme='light'] .hover\:border-amber-400\/40:hover,
+:root[data-theme='light'] .hover\:border-amber-400\/35:hover,
+:root[data-theme='light'] .hover\:border-amber-400\/45:hover {
+  border-color: rgba(180, 83, 9, 0.45) !important;
+}
+
+:root[data-theme='light'] .text-emerald-300 {
+  color: #92400e !important;
+}
+
+:root[data-theme='light'] .text-amber-100,
+:root[data-theme='light'] .text-amber-200 {
+  color: #78350f !important;
+}
+
+:root[data-theme='light'] .text-amber-300 {
+  color: #92400e !important;
+}
+
+:root[data-theme='light'] .text-severity-red {
+  color: #b91c1c !important;
+}
+
+:root[data-theme='light'] .text-severity-yellow {
+  color: #92400e !important;
+}
+
+:root[data-theme='light'] .text-severity-green {
+  color: #166534 !important;
+}
+
+:root[data-theme='light'] .text-severity-grey {
+  color: #475569 !important;
+}
+
+:root[data-theme='light'] .text-indigo-200 {
+  color: #3730a3 !important;
+}
+
+:root[data-theme='light'] .text-orange-200 {
+  color: #9a3412 !important;
+}
+
+:root[data-theme='light'] .bg-severity-red\/15 {
+  background-color: rgba(220, 38, 38, 0.1) !important;
+}
+
+:root[data-theme='light'] .bg-severity-yellow\/15 {
+  background-color: rgba(245, 158, 11, 0.13) !important;
+}
+
+:root[data-theme='light'] .bg-severity-green\/15 {
+  background-color: rgba(34, 197, 94, 0.12) !important;
+}
+
+:root[data-theme='light'] .bg-severity-green\/20 {
+  background-color: rgba(34, 197, 94, 0.16) !important;
+}
+
+:root[data-theme='light'] .bg-severity-grey\/15 {
+  background-color: rgba(100, 116, 139, 0.12) !important;
+}
+
+:root[data-theme='light'] .bg-indigo-500\/20 {
+  background-color: rgba(99, 102, 241, 0.14) !important;
+}
+
+:root[data-theme='light'] .bg-orange-500\/20 {
+  background-color: rgba(249, 115, 22, 0.14) !important;
+}
+
+:root[data-theme='light'] .bg-amber-500\/15 {
+  background-color: rgba(217, 119, 6, 0.14) !important;
+}
+
+:root[data-theme='light'] .bg-amber-500\/20 {
+  background-color: rgba(217, 119, 6, 0.17) !important;
+}
+
+:root[data-theme='light'] .bg-amber-500\/10 {
+  background-color: rgba(217, 119, 6, 0.1) !important;
+}
+
+:root[data-theme='light'] .bg-slate-600\/20 {
+  background-color: rgba(100, 116, 139, 0.12) !important;
+}
+
+:root[data-theme='light'] .border-severity-red\/35 {
+  border-color: rgba(220, 38, 38, 0.35) !important;
+}
+
+:root[data-theme='light'] .border-severity-yellow\/35 {
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+:root[data-theme='light'] .border-severity-green\/35,
+:root[data-theme='light'] .border-severity-green\/50 {
+  border-color: rgba(34, 197, 94, 0.45) !important;
+}
+
+:root[data-theme='light'] .border-severity-grey\/35 {
+  border-color: rgba(100, 116, 139, 0.35) !important;
+}
+
+:root[data-theme='light'] .border-amber-400\/45,
+:root[data-theme='light'] .border-amber-400\/50 {
+  border-color: rgba(180, 83, 9, 0.45) !important;
+}
+
+:root[data-theme='light'] .border-amber-400\/30 {
+  border-color: rgba(180, 83, 9, 0.35) !important;
+}
+
+:root[data-theme='light'] .border-amber-500\/35 {
+  border-color: rgba(180, 83, 9, 0.35) !important;
+}
+
+:root[data-theme='light'] .ring-amber-400\/55 {
+  --tw-ring-color: rgba(180, 83, 9, 0.45) !important;
+}
+
+:root[data-theme='light'] .border-indigo-300\/40 {
+  border-color: rgba(99, 102, 241, 0.38) !important;
+}
+
+:root[data-theme='light'] .border-orange-300\/40 {
+  border-color: rgba(249, 115, 22, 0.4) !important;
+}
+
+:root[data-theme='light'] .border-slate-400\/30 {
+  border-color: rgba(100, 116, 139, 0.38) !important;
+}
+
+:root[data-theme='light'] .chip-red {
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.34);
+  background: rgba(254, 226, 226, 0.95);
+}
+
+:root[data-theme='light'] .chip-yellow {
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.35);
+  background: rgba(255, 237, 213, 0.95);
+}
+
+:root[data-theme='light'] .chip-amber {
+  color: #78350f;
+  border-color: rgba(180, 83, 9, 0.35);
+  background: rgba(254, 243, 199, 0.9);
+}
+
+:root[data-theme='light'] .chip-grey {
+  color: #334155;
+  border-color: rgba(100, 116, 139, 0.35);
+  background: rgba(226, 232, 240, 0.9);
+}
+
+:root[data-theme='light'] .border-red-200\/20 {
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+
+:root[data-theme='light'] .bg-red-500\/10 {
+  background-color: rgba(220, 38, 38, 0.08) !important;
+}
+
+:root[data-theme='light'] .text-red-200 {
+  color: #991b1b !important;
+}
+
+:root[data-theme='light'] .button-accent {
+  color: #6b4226;
+}
