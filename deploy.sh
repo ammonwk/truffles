@@ -36,9 +36,19 @@ rsync -azP --delete \
   --exclude='.env.local' \
   "${SCRIPT_DIR}/" "${HOST}:${REMOTE_DIR}/"
 
+# Sync .env files (not included in rsync --delete to avoid chicken-and-egg)
+echo "[2b/5] Syncing .env files..."
+for envfile in .env apps/api/.env; do
+  if [[ -f "${SCRIPT_DIR}/${envfile}" ]]; then
+    scp ${SSH_OPTS} "${SCRIPT_DIR}/${envfile}" "${HOST}:${REMOTE_DIR}/${envfile}"
+    echo "  -> ${envfile}"
+  fi
+done
+
 # Install production dependencies on server
 echo "[3/5] Installing dependencies on server..."
 ssh ${SSH_OPTS} ${HOST} "cd ${REMOTE_DIR} && npm install --omit=dev 2>&1 | tail -5"
+ssh ${SSH_OPTS} ${HOST} "cd ${REMOTE_DIR} && npx playwright install chromium --with-deps 2>&1 | tail -5"
 
 # Restart services
 echo "[4/5] Restarting services..."

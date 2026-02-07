@@ -1,5 +1,9 @@
 import type { AgentPhase, Severity } from '../index';
 
+// --- Output categories for colored terminal rendering ---
+
+export type OutputCategory = 'assistant' | 'tool' | 'phase_marker' | 'error' | 'false_alarm';
+
 // --- Request/Response types ---
 
 export interface AgentStartRequest {
@@ -26,6 +30,7 @@ export interface AgentOutputEntry {
   timestamp: string;
   phase: AgentPhase;
   content: string;
+  category?: OutputCategory;
 }
 
 export interface AgentSessionDoc {
@@ -48,7 +53,8 @@ export interface AgentSessionDoc {
 // --- WebSocket event types ---
 
 export type AgentStreamEvent =
-  | { type: 'agent:output'; agentId: string; phase: AgentPhase; content: string; timestamp: string }
+  | { type: 'agent:output'; agentId: string; phase: AgentPhase; content: string; timestamp: string; category: OutputCategory }
+  | { type: 'agent:text_delta'; agentId: string; delta: string; timestamp: string }
   | { type: 'agent:phase_change'; agentId: string; phase: AgentPhase; timestamp: string }
   | { type: 'agent:complete'; agentId: string; result: 'done' | 'failed' | 'false_alarm'; prUrl?: string; error?: string; falseAlarmReason?: string }
   | { type: 'agent:started'; agentId: string; issueId: string }

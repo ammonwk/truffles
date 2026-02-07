@@ -1,4 +1,5 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { OutputCategory } from '@truffles/shared';
 
 export interface AgentRunResult {
   success: boolean;
@@ -12,12 +13,20 @@ export interface AgentRunResult {
 }
 
 type OnEvent = (event: {
-  type: 'output' | 'phase' | 'tool' | 'files_modified';
+  type: 'output' | 'phase' | 'tool' | 'files_modified' | 'text_delta';
   phase?: string;
   content?: string;
+  category?: OutputCategory;
   tool?: string;
   files?: string[];
+  delta?: string;
 }) => void;
+
+function classifyOutput(text: string): OutputCategory {
+  if (/TRUFFLES_PHASE:\w+/.test(text)) return 'phase_marker';
+  if (text.includes('TRUFFLES_FALSE_ALARM:')) return 'false_alarm';
+  return 'assistant';
+}
 
 export async function runAgent(opts: {
   worktreePath: string;
@@ -52,7 +61,8 @@ export async function runAgent(opts: {
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         maxTurns: 30,
-        model: 'sonnet',
+        includePartialMessages: true,
+        model: 'claude-opus-4-6',
         systemPrompt: {
           type: 'preset',
           preset: 'claude_code',
@@ -62,6 +72,7 @@ export async function runAgent(opts: {
         additionalDirectories: [opts.repoClonePath + '/.git'],
         abortController: opts.abortController,
         env: {
+          ...process.env,
           GITHUB_TOKEN: process.env.GITHUB_TOKEN!,
           GIT_AUTHOR_NAME: 'Truffles Bot',
           GIT_AUTHOR_EMAIL: 'truffles@autofix.bot',
@@ -72,11 +83,21 @@ export async function runAgent(opts: {
     });
 
     for await (const message of sdkQuery) {
+      // Handle partial streaming events for real-time text deltas
+      if (message.type === 'stream_event') {
+        const evt = (message as { event: { type: string; delta?: { type?: string; text?: string } } }).event;
+        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta' && evt.delta.text) {
+          opts.onEvent({ type: 'text_delta', delta: evt.delta.text });
+        }
+        continue;
+      }
+
       if (message.type === 'assistant' && message.message?.content) {
         for (const block of message.message.content) {
           if ('text' in block && typeof block.text === 'string') {
             const text = block.text;
-            opts.onEvent({ type: 'output', phase: currentPhase, content: text });
+            const category = classifyOutput(text);
+            opts.onEvent({ type: 'output', phase: currentPhase, content: text, category });
 
             // Detect phase markers from agent output
             const phaseMatch = text.match(/TRUFFLES_PHASE:(\w+)/);
@@ -107,7 +128,7 @@ export async function runAgent(opts: {
               filesModified.add(input.file_path);
               opts.onEvent({ type: 'files_modified', files: [...filesModified] });
             }
-            opts.onEvent({ type: 'tool', tool: toolName, content: `Using ${toolName}...` });
+            opts.onEvent({ type: 'tool', tool: toolName, content: `Using ${toolName}...`, category: 'tool' });
           }
         }
       }
@@ -134,8 +155,10 @@ export async function runAgent(opts: {
     }
   } catch (err: unknown) {
     if (opts.abortController.signal.aborted) {
+      opts.onEvent({ type: 'output', phase: currentPhase, content: 'Agent was stopped', category: 'error' });
       return { success: false, falseAlarm: false, filesModified: [...filesModified], error: 'Agent was stopped' };
     }
+    opts.onEvent({ type: 'output', phase: currentPhase, content: String(err), category: 'error' });
     return { success: false, falseAlarm: false, filesModified: [...filesModified], error: String(err) };
   }
 

@@ -1,5 +1,5 @@
-import { AgentSession } from '@truffles/db';
-import type { AgentPhase } from '@truffles/shared';
+import { AgentSession, Issue } from '@truffles/db';
+import type { AgentPhase, OutputCategory } from '@truffles/shared';
 import type {
   AgentStartRequest,
   AgentStartResponse,
@@ -7,8 +7,8 @@ import type {
   AgentListResponse,
   AgentSessionDoc,
 } from '@truffles/shared';
-import { WorktreeManager } from './worktreeManager';
-import { runAgent } from './claudeAgent';
+import { WorktreeManager } from './worktreeManager.js';
+import { runAgent } from './claudeAgent.js';
 
 interface ActiveAgent {
   abortController: AbortController;
@@ -32,8 +32,11 @@ export class AgentManager {
   private githubRepo: string;
 
   // Output batching: collect log entries in memory, flush every 2s
-  private pendingLogs = new Map<string, Array<{ timestamp: Date; phase: string; content: string }>>();
+  private pendingLogs = new Map<string, Array<{ timestamp: Date; phase: string; content: string; category?: OutputCategory }>>();
   private flushInterval: NodeJS.Timeout;
+
+  // Delta coalescing: accumulate text_delta fragments per agent, flush every 50ms
+  private deltaBuffers = new Map<string, { text: string; timer: NodeJS.Timeout | null }>();
 
   constructor(config: {
     maxConcurrent: number;
@@ -55,6 +58,10 @@ export class AgentManager {
   }
 
   async startAgent(request: AgentStartRequest): Promise<AgentStartResponse> {
+    if (!this.repoClonePath || !this.worktreeManager) {
+      throw new Error('Agent runner not configured — set REPO_CLONE_PATH and WORKTREE_BASE_PATH in .env');
+    }
+
     const session = await AgentSession.create({
       issueId: request.issueId,
       status: 'queued',
@@ -137,14 +144,22 @@ export class AgentManager {
         onEvent: (event) => {
           const now = new Date().toISOString();
 
+          // Route text_delta events through coalescing buffer (NOT stored in DB)
+          if (event.type === 'text_delta' && event.delta) {
+            this.emitDelta(sessionId, event.delta);
+            return;
+          }
+
           // Broadcast to WS immediately for real-time streaming
           if (event.type === 'output' || event.type === 'tool') {
+            const category = event.category ?? 'assistant';
             this.broadcast({
               type: 'agent:output',
               agentId: sessionId,
               phase: (event.phase ?? 'starting') as AgentPhase,
               content: event.content ?? '',
               timestamp: now,
+              category,
             });
 
             // Batch log entries for DB
@@ -155,6 +170,7 @@ export class AgentManager {
               timestamp: new Date(),
               phase: event.phase ?? 'starting',
               content: event.content ?? '',
+              category,
             });
           }
 
@@ -205,6 +221,31 @@ export class AgentManager {
         error: result.error,
       });
 
+      // Update the linked Issue with PR info
+      if (result.prUrl && result.prNumber) {
+        const agentDoc = await AgentSession.findById(sessionId).lean();
+        if (agentDoc?.issueId) {
+          await Issue.findByIdAndUpdate(agentDoc.issueId, {
+            status: 'pr_open',
+            prNumber: result.prNumber,
+            prUrl: result.prUrl,
+            agentSessionId: sessionId,
+          });
+        }
+      }
+
+      // Update the linked Issue for false alarms
+      if (result.falseAlarm) {
+        const agentDoc = await AgentSession.findById(sessionId).lean();
+        if (agentDoc?.issueId) {
+          await Issue.findByIdAndUpdate(agentDoc.issueId, {
+            status: 'false_alarm',
+            falseAlarmReason: result.falseAlarmReason || 'Agent reported false alarm',
+            agentSessionId: sessionId,
+          });
+        }
+      }
+
       this.broadcast({
         type: 'agent:complete',
         agentId: sessionId,
@@ -232,6 +273,7 @@ export class AgentManager {
       clearTimeout(timeout);
       this.active.delete(sessionId);
       this.pendingLogs.delete(sessionId);
+      this.flushDeltaBuffer(sessionId);
 
       // Cleanup worktree
       this.worktreeManager.removeWorktree(worktreePath).catch((err) => {
@@ -271,6 +313,7 @@ export class AgentManager {
 
     this.active.delete(sessionId);
     this.pendingLogs.delete(sessionId);
+    this.flushDeltaBuffer(sessionId);
 
     this.broadcast({
       type: 'agent:stopped',
@@ -280,6 +323,18 @@ export class AgentManager {
 
     this.processQueue();
     return true;
+  }
+
+  setMaxConcurrent(value: number): void {
+    this.maxConcurrent = value;
+    console.log(`[agent-manager] maxConcurrent updated to ${value}`);
+    // Drain the queue in case the new limit allows more agents to start
+    this.processQueue();
+  }
+
+  setTimeoutMinutes(value: number): void {
+    this.timeoutMinutes = value;
+    console.log(`[agent-manager] timeoutMinutes updated to ${value}`);
   }
 
   async getStatus(): Promise<AgentListResponse> {
@@ -301,6 +356,7 @@ export class AgentManager {
           timestamp: e.timestamp?.toISOString() ?? new Date().toISOString(),
           phase: (e.phase ?? 'starting') as AgentPhase,
           content: e.content ?? '',
+          category: (e.category as OutputCategory | undefined) ?? 'assistant',
         })),
         filesModified: doc.filesModified ?? [],
         error: doc.error ?? undefined,
@@ -334,6 +390,7 @@ export class AgentManager {
         timestamp: e.timestamp?.toISOString() ?? new Date().toISOString(),
         phase: (e.phase ?? 'starting') as AgentPhase,
         content: e.content ?? '',
+        category: (e.category as OutputCategory | undefined) ?? 'assistant',
       })),
       filesModified: doc.filesModified ?? [],
       error: doc.error ?? undefined,
@@ -362,6 +419,49 @@ export class AgentManager {
 
     // Cleanup all worktrees
     await this.worktreeManager.cleanupAll();
+  }
+
+  private emitDelta(sessionId: string, delta: string): void {
+    let buf = this.deltaBuffers.get(sessionId);
+    if (!buf) {
+      buf = { text: '', timer: null };
+      this.deltaBuffers.set(sessionId, buf);
+    }
+    buf.text += delta;
+
+    if (!buf.timer) {
+      buf.timer = setTimeout(() => {
+        const current = this.deltaBuffers.get(sessionId);
+        if (current && current.text) {
+          this.broadcast({
+            type: 'agent:text_delta',
+            agentId: sessionId,
+            delta: current.text,
+            timestamp: new Date().toISOString(),
+          });
+          current.text = '';
+        }
+        if (current) {
+          current.timer = null;
+        }
+      }, 50);
+    }
+  }
+
+  private flushDeltaBuffer(sessionId: string): void {
+    const buf = this.deltaBuffers.get(sessionId);
+    if (buf) {
+      if (buf.timer) clearTimeout(buf.timer);
+      if (buf.text) {
+        this.broadcast({
+          type: 'agent:text_delta',
+          agentId: sessionId,
+          delta: buf.text,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      this.deltaBuffers.delete(sessionId);
+    }
   }
 
   private async flushLogs(): Promise<void> {

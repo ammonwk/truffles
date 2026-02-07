@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/mockData.ts","./src/useProcessingWebSocket.ts","./src/vite-env.d.ts"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/GrassBackground.tsx","./src/api.ts","./src/main.tsx","./src/toastState.ts","./src/useAgentWebSocket.ts","./src/useProcessingWebSocket.ts","./src/vite-env.d.ts","./src/components/AsciiPlayer.tsx"],"version":"5.9.3"}

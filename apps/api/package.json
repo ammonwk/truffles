@@ -11,24 +11,27 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@truffles/shared": "*",
-    "@truffles/db": "*",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.34",
     "@aws-sdk/client-s3": "^3.500.0",
     "@aws-sdk/s3-request-presigner": "^3.500.0",
-    "express": "^4.21.0",
+    "@truffles/db": "*",
+    "@truffles/shared": "*",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
-    "ws": "^8.18.0",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.34",
-    "uuid": "^11.0.0"
+    "express": "^4.21.0",
+    "fflate": "^0.8.2",
+    "playwright": "^1.58.0",
+    "rrweb-player": "2.0.0-alpha.20",
+    "uuid": "^11.0.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/uuid": "^10.0.0",
-    "@types/express": "^5.0.0",
     "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.7.0"
   }
 }

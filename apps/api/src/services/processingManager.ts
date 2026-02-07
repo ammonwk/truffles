@@ -6,17 +6,19 @@ import type { ProcessSessionsResponse, WsMessage, WsProcessingProgress } from '@
 import {
   getSessionSnapshots,
   getSessionMetadata,
-} from './posthog';
+  extractConsoleErrors,
+  extractNetworkFailures,
+} from './posthog.js';
 import {
   renderSessionVideo,
   generateThumbnail,
   cleanupTempDir,
-} from './rrvideo';
+} from './rrvideo.js';
 import {
   uploadFile,
   getPresignedUrl,
   getS3Key,
-} from './s3';
+} from './s3.js';
 
 type BroadcastFn = (message: WsMessage) => void;
 
@@ -28,11 +30,17 @@ interface ActiveJob {
 export class ProcessingManager {
   private queue: string[] = [];
   private activeJobs = new Map<string, ActiveJob>();
+  private cancelledSessions = new Set<string>();
   private maxConcurrent = 20;
   private broadcast: BroadcastFn;
+  private onSessionComplete?: (posthogSessionId: string) => void;
 
   constructor(broadcast: BroadcastFn) {
     this.broadcast = broadcast;
+  }
+
+  setOnSessionComplete(callback: (posthogSessionId: string) => void): void {
+    this.onSessionComplete = callback;
   }
 
   async enqueue(sessionIds: string[]): Promise<ProcessSessionsResponse> {
@@ -96,8 +104,16 @@ export class ProcessingManager {
     }
   }
 
+  private checkCancelled(sessionId: string): void {
+    if (this.cancelledSessions.has(sessionId)) {
+      throw new Error('Cancelled by user');
+    }
+  }
+
   private async processSession(sessionId: string): Promise<void> {
     try {
+      this.checkCancelled(sessionId);
+
       // Broadcast started
       this.broadcast({
         type: 'processing:started',
@@ -112,11 +128,20 @@ export class ProcessingManager {
 
       // Phase 1: Download rrweb events
       this.broadcastProgress(sessionId, 'downloading', 10, 'Downloading session recordings');
+      this.checkCancelled(sessionId);
       const rrwebEvents = await getSessionSnapshots(sessionId);
+      console.log(`[processing] ${sessionId}: downloaded ${rrwebEvents.length} rrweb events`);
       this.broadcastProgress(sessionId, 'downloading', 20, `Downloaded ${rrwebEvents.length} events`);
 
       // Fetch metadata
       const meta = await getSessionMetadata(sessionId);
+
+      // Extract console errors and network failures from rrweb events
+      const consoleErrors = extractConsoleErrors(rrwebEvents);
+      const networkFailures = extractNetworkFailures(rrwebEvents);
+      console.log(
+        `[processing] ${sessionId}: extracted ${consoleErrors.length} console errors, ${networkFailures.length} network failures`,
+      );
 
       // Update session with metadata
       const firstTimestamp = rrwebEvents[0]?.timestamp ?? Date.now();
@@ -131,12 +156,13 @@ export class ProcessingManager {
           startTime: new Date(firstTimestamp),
           duration: durationSec,
           metadata: meta.metadata,
-          consoleErrors: meta.consoleErrors,
-          networkFailures: meta.networkFailures,
+          consoleErrors,
+          networkFailures,
         },
       );
 
       // Phase 2: Render video via rrvideo
+      this.checkCancelled(sessionId);
       this.broadcastProgress(sessionId, 'rendering', 25, 'Starting video render');
       const { outputPath: videoPath, durationSec: videoDuration } = await renderSessionVideo(
         sessionId,
@@ -159,6 +185,7 @@ export class ProcessingManager {
       }
 
       // Phase 3: Upload to S3
+      this.checkCancelled(sessionId);
       this.broadcastProgress(sessionId, 'uploading', 80, 'Uploading video to S3');
 
       const videoKey = getS3Key(sessionId, 'recording.mp4');
@@ -182,6 +209,7 @@ export class ProcessingManager {
       }
 
       this.broadcastProgress(sessionId, 'uploading', 95, 'Finalizing');
+      this.checkCancelled(sessionId);
 
       // Update session doc
       await Session.updateOne(
@@ -206,6 +234,11 @@ export class ProcessingManager {
           thumbnailUrl: thumbnailPresigned,
         },
       });
+
+      // Trigger analysis pipeline
+      if (this.onSessionComplete) {
+        this.onSessionComplete(sessionId);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error(`Processing failed for ${sessionId}:`, message);
@@ -222,6 +255,7 @@ export class ProcessingManager {
       });
     } finally {
       this.activeJobs.delete(sessionId);
+      this.cancelledSessions.delete(sessionId);
       await cleanupTempDir(sessionId);
       this.processNext();
     }
@@ -264,6 +298,57 @@ export class ProcessingManager {
 
   getActiveJobs(): ActiveJob[] {
     return Array.from(this.activeJobs.values());
+  }
+
+  async reprocess(sessionId: string): Promise<void> {
+    // Skip if already in-flight
+    if (this.activeJobs.has(sessionId) || this.queue.includes(sessionId)) {
+      throw new Error('Session is already being processed');
+    }
+
+    // Reset status regardless of current state
+    await Session.updateOne(
+      { posthogSessionId: sessionId },
+      { status: 'pending', errorMessage: null, videoUrl: null, thumbnailUrl: null },
+    );
+
+    this.queue.push(sessionId);
+    this.processNext();
+  }
+
+  async cancel(sessionId: string): Promise<void> {
+    // Remove from queue if still pending
+    const queueIdx = this.queue.indexOf(sessionId);
+    if (queueIdx !== -1) {
+      this.queue.splice(queueIdx, 1);
+      await Session.updateOne(
+        { posthogSessionId: sessionId },
+        { status: 'error', errorMessage: 'Cancelled by user' },
+      );
+      this.broadcast({
+        type: 'processing:error',
+        sessionId,
+        data: { error: 'Cancelled by user' },
+      });
+      return;
+    }
+
+    // Mark active job as cancelled so it bails out at the next checkpoint
+    if (this.activeJobs.has(sessionId)) {
+      this.cancelledSessions.add(sessionId);
+      await Session.updateOne(
+        { posthogSessionId: sessionId },
+        { status: 'error', errorMessage: 'Cancelled by user' },
+      );
+      this.broadcast({
+        type: 'processing:error',
+        sessionId,
+        data: { error: 'Cancelled by user' },
+      });
+      return;
+    }
+
+    throw new Error('Session is not currently processing');
   }
 
   getQueueLength(): number {

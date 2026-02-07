@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import type { AgentManager } from '../services/agentManager';
-import { requireAdmin } from '../middleware/auth';
+import type { AgentManager } from '../services/agentManager.js';
+import { requireAdmin } from '../middleware/auth.js';
 import type { AgentStartRequest } from '@truffles/shared';
 
 export function createAgentRouter(manager: AgentManager): Router {

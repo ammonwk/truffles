@@ -32,6 +32,7 @@ export interface HealthResponse {
 export interface PostHogSessionSummary {
   id: string;
   distinctId: string;
+  userEmail: string;
   startTime: string;
   endTime: string;
   durationSec: number;
@@ -96,6 +97,15 @@ export interface WsProcessingProgress {
   message: string;
 }
 
+export interface PostHogSyncResult {
+  newSessions: number;
+  totalFetched: number;
+}
+
 export const APP_VERSION = '0.1.0';
 
 export * from './types/agent';
+export * from './types/issue';
+export * from './types/settings';
+export * from './types/suppression';
+export * from './types/analysis';

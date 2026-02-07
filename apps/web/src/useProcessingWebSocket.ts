@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WsMessage, ProcessingPhase } from '@truffles/shared';
+import { addToast } from './toastState';
 
 interface ProcessingState {
   status: 'processing' | 'complete' | 'error';
@@ -23,11 +24,8 @@ export function useProcessingWebSocket(): UseProcessingWebSocketResult {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = useCallback(() => {
-    // In dev, connect directly to API port since Vite proxy doesn't handle WS upgrades
-    const isDev = import.meta.env.DEV;
-    const wsUrl = isDev
-      ? 'ws://localhost:4000/ws'
-      : `wss://${window.location.host}/ws`;
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProto}//${window.location.host}/ws`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -92,16 +90,20 @@ export function useProcessingWebSocket(): UseProcessingWebSocketResult {
                 videoUrl: completeData.videoUrl,
                 thumbnailUrl: completeData.thumbnailUrl,
               };
+              addToast('Session video rendered', 'success');
               break;
             }
 
-            case 'processing:error':
+            case 'processing:error': {
+              const errorMsg = (msg.data as { error?: string }).error ?? 'Unknown error';
               next[msg.sessionId] = {
                 status: 'error',
-                error: (msg.data as { error?: string }).error ?? 'Unknown error',
+                error: errorMsg,
                 message: 'Failed',
               };
+              addToast(`Processing failed: ${errorMsg}`, 'error');
               break;
+            }
           }
 
           return next;

@@ -11,8 +11,7 @@ Broken into workstreams that can be developed in parallel by multiple agents/dev
 **Deliverables:**
 - [ ] Turborepo root with `turbo.json`
 - [ ] `apps/web` — React frontend (Vite + React Router + Tailwind + TypeScript)
-- [ ] `apps/api` — Express backend (TypeScript)
-- [ ] `apps/sidecar` — Agent runner service (TypeScript)
+- [ ] `apps/api` — Express backend (TypeScript) with agent runner in-process
 - [ ] `packages/shared` — Shared types, constants, utility functions
 - [ ] `packages/db` — MongoDB models (Mongoose schemas), connection helper
 - [ ] `.env.example` for all apps
@@ -20,7 +19,7 @@ Broken into workstreams that can be developed in parallel by multiple agents/dev
 - [ ] ESLint + Prettier config (shared)
 - [ ] `tsconfig` base config (shared)
 
-**Done when:** `turbo dev` starts all three apps, TypeScript compiles, lint passes.
+**Done when:** `turbo dev` starts both apps, TypeScript compiles, lint passes.
 
 ---
 
@@ -93,21 +92,21 @@ Broken into workstreams that can be developed in parallel by multiple agents/dev
 
 ## Workstream 3: Fix Orchestrator & Claude Code Agent Runner
 
-**What:** For each verified issue, create a git worktree, spawn a Claude Code SDK agent to verify + fix + PR, and stream output back.
+**What:** For each verified issue, create a git worktree, spawn a Claude Code SDK agent to verify + fix + PR, and stream output back. All agent execution runs in-process on the API server — no separate sidecar service.
 
 **Deliverables:**
 
-### Sidecar Service (`apps/sidecar/`)
-- [ ] Express server with auth middleware (shared secret)
-- [ ] Agent manager (`src/services/agentManager.ts`)
+### Agent Runner (in-process, `apps/api/src/services/`)
+- [ ] Agent manager (`agentManager.ts`)
   - Queue incoming fix requests
   - Respect concurrency limit (from settings, default 5)
   - Track active agents, handle timeouts
-- [ ] Worktree manager (`src/services/worktreeManager.ts`)
+  - Broadcast agent lifecycle events via WebSocket
+- [ ] Worktree manager (`worktreeManager.ts`)
   - `git worktree add` from the local repo clone
   - Create branch: `truffles/fix-<issue-id-short>`
   - Cleanup on completion or timeout
-- [ ] Claude Code SDK integration (`src/services/claudeAgent.ts`)
+- [ ] Claude Code SDK integration (`claudeAgent.ts`)
   - Use `@anthropic-ai/claude-code` SDK (NOT the CLI directly)
   - Configure with `--dangerously-skip-permissions`
   - Pass detailed prompt with:
@@ -116,7 +115,7 @@ Broken into workstreams that can be developed in parallel by multiple agents/dev
     - Target codebase info (it's a MERN Turborepo)
     - Explicit instruction: "If you cannot find code related to this issue, report a false alarm. Do NOT make speculative changes."
     - Steps: verify → plan → fix → lint → typecheck → self-review → open PR
-  - Stream output events back via WebSocket to primary
+  - Stream output events directly to WebSocket clients
   - Parse agent phases from output (verifying / planning / coding / reviewing)
 - [ ] PR creation helper
   - Agent uses `gh pr create` within its session
@@ -124,18 +123,13 @@ Broken into workstreams that can be developed in parallel by multiple agents/dev
   - PR body includes: issue description, session link, analysis reasoning
   - PR labeled with `truffles-autofix`
 - [ ] False alarm handler
-  - If agent reports false alarm, callback to primary with reason
-  - Primary adds to `falseAlarms` collection automatically
-- [ ] REST + WebSocket endpoints (as defined in infra doc)
+  - If agent reports false alarm, add to `falseAlarms` collection automatically
+  - Update issue status to `false_alarm`
 
-### Primary Side (Orchestrator)
-- [ ] Fix orchestrator worker (`apps/api/src/workers/fixOrchestrator.ts`)
-  - After screening passes, queue issues for fixing
-  - Send fix requests to sidecar
-  - Handle callbacks (PR opened, false alarm, failure)
-  - Update issue status in MongoDB
+### Orchestration (in-process, `apps/api/src/services/`)
+- [ ] Analysis manager auto-queues agents after screening passes
 - [ ] Agent session MongoDB model and CRUD endpoints
-- [ ] WebSocket relay: proxy sidecar agent streams to frontend clients
+- [ ] WebSocket endpoint (`/ws/agents`) streams agent output directly to frontend
 
 **Done when:** Issues automatically get fixed, PRs appear on GitHub with the `truffles-autofix` label, false alarms are learned, and agent progress is visible in the Agent Lab.
 
@@ -242,11 +236,11 @@ Broken into workstreams that can be developed in parallel by multiple agents/dev
 - [ ] Error states for every view (loading spinners, empty states, error messages)
 - [ ] Toast notifications for key events (new issues found, PR opened, agent completed)
 - [ ] WebSocket reconnection logic
-- [ ] Graceful degradation if sidecar is unreachable
+- [ ] Graceful error handling if agent runner encounters failures
 - [ ] Rate limit handling for all external APIs
 - [ ] Cleanup cron: remove old worktrees, expire old presigned URLs
 - [ ] Health check endpoints (`/health` on both services)
-- [ ] pm2 ecosystem config for both instances
+- [ ] pm2 ecosystem config
 - [ ] NGINX config for primary
 - [ ] Deployment scripts (or at minimum, clear setup instructions in README)
 

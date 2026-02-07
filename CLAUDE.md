@@ -11,8 +11,7 @@ This is a **Turborepo monorepo** (MERN stack, TypeScript, Tailwind):
 ```
 apps/
   web/          — React frontend (Vite + React Router + Tailwind)
-  api/          — Express backend (REST + WebSocket)
-  sidecar/      — Claude Code agent runner (runs on separate EC2)
+  api/          — Express backend (REST + WebSocket + agent runner, all in-process)
 packages/
   shared/       — Shared TypeScript types, constants, utils
   db/           — Mongoose models, MongoDB connection
@@ -39,7 +38,7 @@ docs/           — Planning documents (UI/UX, infra, deliverables)
 
 ### Claude Code SDK Usage
 - **IMPORTANT:** Before writing any code that uses the Claude Code SDK (`@anthropic-ai/claude-code`), you MUST first review the SDK documentation or consult the claude-code-guide subagent to understand the current API surface. The SDK is relatively new and has specific patterns for streaming, configuration, and error handling. Do not guess at the API.
-- Agents run with `--dangerously-skip-permissions` on the sidecar EC2 only.
+- Agents run in-process on the API server with `--dangerously-skip-permissions`.
 - Each agent gets its own git worktree for isolation.
 
 ### False Alarm System
@@ -54,7 +53,7 @@ docs/           — Planning documents (UI/UX, infra, deliverables)
 - **Backend:** Express, Mongoose, WebSocket (ws)
 - **Database:** MongoDB 7
 - **External APIs:** PostHog (cloud), OpenRouter (Kimi K2.5, Gemini 3 Pro, Claude Opus 4.6), AWS S3, GitHub
-- **Video Rendering:** Puppeteer + rrweb-player → MP4
+- **Video Rendering:** rrvideo CLI + ffmpeg → MP4
 - **Agent SDK:** @anthropic-ai/claude-code
 
 ## Models Used (via OpenRouter)
@@ -78,7 +77,6 @@ turbo typecheck              # TypeScript check all
 # Individual apps
 cd apps/web && npm run dev   # Frontend on :3000
 cd apps/api && npm run dev   # API on :4000
-cd apps/sidecar && npm run dev # Sidecar on :5000
 ```
 
 ## Environment Variables
@@ -90,9 +88,8 @@ See `.env.example` files in each app directory. Key ones:
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — S3 access
 - `S3_BUCKET` — Bucket for video storage
 - `GITHUB_TOKEN` — GitHub PAT with repo scope
-- `ANTHROPIC_API_KEY` — For Claude Code SDK (sidecar only)
+- `ANTHROPIC_API_KEY` — For Claude Code SDK (agent runner in API process)
 - `ADMIN_PASSWORD` — Password for Settings page
-- `SIDECAR_URL` / `SIDECAR_SECRET` — Inter-service auth
 
 ## Code Style
 
@@ -110,7 +107,6 @@ See `.env.example` files in each app directory. Key ones:
 - NEVER commit `.env` files or API keys
 - NEVER add auth to read-only endpoints (this is intentional, not a bug)
 - ALL mutating endpoints must check the admin password
-- The sidecar must validate the shared secret on every request
 - Presigned S3 URLs expire after 1 hour
 - Claude Code agents are isolated in individual worktrees
 - Agent timeout enforced server-side (kill process after N minutes)

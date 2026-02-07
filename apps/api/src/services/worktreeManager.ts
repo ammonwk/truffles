@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -8,23 +8,24 @@ export class WorktreeManager {
   constructor(
     private repoClonePath: string,
     private worktreeBasePath: string,
+    private defaultBranch: string = process.env.REPO_DEFAULT_BRANCH || 'staging',
   ) {}
 
   async createWorktree(issueId: string): Promise<{ worktreePath: string; branchName: string }> {
     await mkdir(this.worktreeBasePath, { recursive: true });
 
-    // Fetch latest main
+    // Fetch latest default branch
     try {
-      await this.git('fetch', 'origin', 'main');
+      await this.git('fetch', 'origin', this.defaultBranch);
     } catch (err) {
-      console.warn('[worktree] failed to fetch origin main, continuing with local:', err);
+      console.warn(`[worktree] failed to fetch origin ${this.defaultBranch}, continuing with local:`, err);
     }
 
     const shortId = issueId.slice(-8);
     const branchName = `truffles/fix-${shortId}`;
     const worktreePath = `${this.worktreeBasePath}/wt-${shortId}-${Date.now()}`;
 
-    await this.git('worktree', 'add', '-b', branchName, worktreePath, 'origin/main');
+    await this.git('worktree', 'add', '-b', branchName, worktreePath, `origin/${this.defaultBranch}`);
 
     console.log(`[worktree] created: ${worktreePath} on branch ${branchName}`);
     return { worktreePath, branchName };
@@ -50,6 +51,34 @@ export class WorktreeManager {
     }
   }
 
+  async cleanupOrphaned(maxAgeMs = 2 * 60 * 60 * 1000): Promise<number> {
+    let removed = 0;
+    try {
+      const entries = await readdir(this.worktreeBasePath);
+      const now = Date.now();
+
+      for (const entry of entries) {
+        if (!entry.startsWith('wt-')) continue;
+        const fullPath = `${this.worktreeBasePath}/${entry}`;
+        try {
+          const info = await stat(fullPath);
+          if (now - info.mtimeMs > maxAgeMs) {
+            await this.removeWorktree(fullPath);
+            removed++;
+            console.log(`[worktree] cleaned up orphaned: ${entry}`);
+          }
+        } catch {
+          // entry may have been removed concurrently
+        }
+      }
+
+      await this.git('worktree', 'prune').catch(() => {});
+    } catch {
+      // base path may not exist yet
+    }
+    return removed;
+  }
+
   async cleanupAll(): Promise<void> {
     try {
       await this.git('worktree', 'prune');
@@ -59,7 +88,6 @@ export class WorktreeManager {
 
     try {
       // Remove all wt-* directories
-      const { readdir } = await import('node:fs/promises');
       const entries = await readdir(this.worktreeBasePath);
       for (const entry of entries) {
         if (entry.startsWith('wt-')) {

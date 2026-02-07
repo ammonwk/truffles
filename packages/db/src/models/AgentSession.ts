@@ -27,6 +27,7 @@ const agentSessionSchema = new Schema(
         timestamp: { type: Date, default: Date.now },
         phase: { type: String },
         content: { type: String },
+        category: { type: String, default: 'assistant' },
       },
     ],
     filesModified: { type: [String], default: [] },
