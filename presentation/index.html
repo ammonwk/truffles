@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Truffles — Curiosity Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Dark theme (default) ── */
+    :root, [data-theme="dark"] {
+      --bg: #0a0a0b;
+      --bg-card: #111113;
+      --bg-card-hover: #18181b;
+      --bg-nav: rgba(10, 10, 11, 0.82);
+      --border: #27272a;
+      --border-light: #3f3f46;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --accent: #c084fc;
+      --accent-dim: #7c3aed;
+      --accent-glow: rgba(192, 132, 252, 0.08);
+      --hero-glow: rgba(192, 132, 252, 0.06);
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --shadow-screenshot: 0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    /* ── Light theme ── */
+    [data-theme="light"] {
+      --bg: #fafafa;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f4f4f5;
+      --bg-nav: rgba(250, 250, 250, 0.82);
+      --border: #e4e4e7;
+      --border-light: #d4d4d8;
+      --text: #09090b;
+      --text-muted: #52525b;
+      --text-dim: #a1a1aa;
+      --accent: #7c3aed;
+      --accent-dim: #6d28d9;
+      --accent-glow: rgba(124, 58, 237, 0.06);
+      --hero-glow: rgba(124, 58, 237, 0.05);
+      --red: #dc2626;
+      --yellow: #d97706;
+      --green: #16a34a;
+      --blue: #2563eb;
+      --shadow-screenshot: 0 4px 32px rgba(0,0,0,0.1);
+    }
+
+    html {
+      font-size: 16px;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    code, .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: var(--bg-nav);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.4s ease, border-color 0.4s ease;
+    }
+    nav .inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    nav .logo {
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      transition: color 0.4s ease;
+    }
+    nav .logo span { color: var(--accent); transition: color 0.4s ease; }
+    nav .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 1.75rem;
+    }
+    /* ── Rotating quip ── */
+    .quip {
+      font-size: 0.8rem;
+      font-style: italic;
+      color: var(--text-dim);
+      text-align: right;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 360px;
+      transition: opacity 0.4s ease, transform 0.4s ease, color 0.4s ease;
+      user-select: none;
+    }
+    .quip.fade-out {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+
+    /* ── Theme toggle ── */
+    .theme-toggle {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 2.25rem;
+      height: 2.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.3s ease, border-color 0.3s ease;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-light);
+    }
+    .theme-toggle svg {
+      width: 1.1rem;
+      height: 1.1rem;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .theme-toggle .icon-sun,
+    .theme-toggle .icon-moon { color: var(--text-muted); }
+    [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+    [data-theme="light"] .theme-toggle .icon-sun { display: none; }
+    [data-theme="light"] .theme-toggle .icon-moon { display: block; }
+
+    /* ── Sections ── */
+    section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 6rem 2rem;
+    }
+    section:first-of-type { padding-top: 8rem; }
+
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      transition: color 0.4s ease;
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      transition: color 0.4s ease;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      transition: color 0.4s ease;
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.5rem;
+      transition: color 0.4s ease;
+    }
+
+    p.lead {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 640px;
+      line-height: 1.8;
+      transition: color 0.4s ease;
+    }
+
+    p.body {
+      color: var(--text-muted);
+      max-width: 640px;
+      line-height: 1.8;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Hero ── */
+    #hero {
+      padding-top: 10rem;
+      padding-bottom: 4rem;
+      position: relative;
+    }
+    #hero::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--hero-glow) 0%, transparent 70%);
+      pointer-events: none;
+      transition: background 0.4s ease;
+    }
+    .hero-sub {
+      font-size: 1rem;
+      color: var(--text-dim);
+      margin-top: 2rem;
+      font-weight: 400;
+      transition: color 0.4s ease;
+    }
+    .hero-sub span {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+    .divider hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      transition: border-color 0.4s ease;
+    }
+
+    /* ── Cards ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-light);
+    }
+    .card .icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+    .card h3 { color: var(--text); }
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Pipeline ── */
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+      margin-top: 2.5rem;
+    }
+    .pipeline-step {
+      display: grid;
+      grid-template-columns: 3.5rem 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .step-number {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--accent);
+      flex-shrink: 0;
+      transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+    }
+    .step-content h3 {
+      margin-bottom: 0.4rem;
+    }
+    .step-content p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      margin-bottom: 1rem;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Screenshot with crossfade ── */
+    .screenshot {
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 0.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-screenshot);
+      transition: box-shadow 0.4s ease;
+    }
+    .screenshot img {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+      transition: opacity 0.5s ease;
+    }
+    .screenshot .img-dark,
+    .screenshot .img-light {
+      width: 100%;
+      border-radius: 10px;
+    }
+    .screenshot .img-light {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* Dark mode: show dark, hide light */
+    [data-theme="dark"] .screenshot .img-dark  { opacity: 1; }
+    [data-theme="dark"] .screenshot .img-light { opacity: 0; }
+    /* Light mode: show light, hide dark */
+    [data-theme="light"] .screenshot .img-dark  { opacity: 0; }
+    [data-theme="light"] .screenshot .img-light { opacity: 1; }
+
+    /* ── Tech grid ── */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .tech-item {
+      padding: 1.25rem;
+      border-radius: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    .tech-item .label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+      transition: color 0.4s ease;
+    }
+    .tech-item .value {
+      font-size: 0.95rem;
+      color: var(--text);
+      font-weight: 500;
+      transition: color 0.4s ease;
+    }
+    .tech-item .detail {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Architecture ── */
+    .arch-flow {
+      margin-top: 2rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      overflow-x: auto;
+      transition: background 0.4s ease, border-color 0.4s ease;
+    }
+    .arch-flow pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.8;
+      color: var(--text-muted);
+      white-space: pre;
+      transition: color 0.4s ease;
+    }
+    .arch-flow .hl { color: var(--accent); font-weight: 500; }
+    .arch-flow .dim { color: var(--text-dim); }
+    .arch-flow .grn { color: var(--green); }
+    .arch-flow .ylw { color: var(--yellow); }
+    .arch-flow .red { color: var(--red); }
+    .arch-flow .blu { color: var(--blue); }
+
+    /* ── Learnings list ── */
+    .learnings {
+      margin-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .learning-item {
+      padding-left: 1.25rem;
+      border-left: 2px solid var(--border);
+      transition: border-color 0.2s;
+    }
+    .learning-item:hover {
+      border-color: var(--accent);
+    }
+    .learning-item h3 {
+      font-size: 1rem;
+      margin-bottom: 0.3rem;
+    }
+    .learning-item p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      transition: color 0.4s ease;
+    }
+
+    /* ── DevOps connection ── */
+    .connection-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    .connection-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      border-top: 2px solid var(--accent-dim);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    .connection-card h3 {
+      margin-bottom: 0.4rem;
+    }
+    .connection-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Footer ── */
+    footer {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 3rem 2rem 4rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      transition: border-color 0.4s ease, color 0.4s ease;
+    }
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Present button ── */
+    .present-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.4rem 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.02em;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+    .present-btn:hover {
+      color: var(--text);
+      border-color: var(--border-light);
+      background: var(--bg-card);
+    }
+
+    /* ── Slideshow overlay ── */
+    html.slideshow-active { overflow: hidden; }
+    html.slideshow-active body { overflow: hidden; }
+    html.slideshow-active > body > nav,
+    html.slideshow-active > body > .present-btn { display: none; }
+
+    #slideshow {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      transition: background 0.4s ease;
+    }
+
+    .slideshow-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Slides ── */
+    .slideshow-slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 5rem;
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      pointer-events: none;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .slideshow-slide.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .slide-inner {
+      max-width: 960px;
+      width: 100%;
+    }
+
+    /* Slide type: hero */
+    .slide-hero .slide-inner {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .slide-hero h1 {
+      font-size: clamp(3.5rem, 8vw, 6rem);
+      margin-bottom: 1.25rem;
+    }
+    .slide-hero .lead {
+      font-size: 1.35rem;
+      max-width: 700px;
+    }
+    .slide-hero .hero-sub {
+      margin-top: 3rem;
+      font-size: 1.05rem;
+    }
+
+    /* Slide type: section — tighten spacing */
+    .slide-section h2 { margin-bottom: 0.75rem; }
+    .slide-section .card-grid,
+    .slide-section .connection-grid {
+      margin-top: 1.5rem;
+    }
+    .slide-section .tech-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .slide-section .tech-item { padding: 1rem; }
+    .slide-section .arch-flow { margin-top: 1.25rem; padding: 2rem; }
+    .slide-section .learnings { margin-top: 1.25rem; gap: 1rem; }
+    .slide-section .learning-item h3 { font-size: 0.95rem; }
+    .slide-section .learning-item p { font-size: 0.85rem; }
+
+    /* Slide type: pipeline step */
+    .slide-step .slide-inner { max-width: 1000px; }
+    .slide-step .step-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+      transition: color 0.4s ease;
+    }
+    .slide-step h2 {
+      font-size: 1.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .slide-step p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      max-width: 720px;
+      margin-bottom: 1.25rem;
+      transition: color 0.4s ease;
+    }
+    .slide-step .screenshot {
+      margin-top: 0.5rem;
+      max-width: 100%;
+    }
+    .slide-step .screenshot img {
+      max-height: 52vh;
+      width: 100%;
+      object-fit: contain;
+      object-position: top left;
+    }
+
+    /* ── Nav arrows ── */
+    .slideshow-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      transition: all 0.2s;
+      z-index: 10;
+      font-family: inherit;
+    }
+    .slideshow-nav:hover {
+      background: var(--bg-card-hover);
+      color: var(--text);
+      border-color: var(--border-light);
+    }
+    .slideshow-nav.prev { left: 1.25rem; }
+    .slideshow-nav.next { right: 1.25rem; }
+    .slideshow-nav.disabled {
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    /* ── Progress bar ── */
+    .slideshow-progress {
+      height: 2px;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 0.4s ease;
+    }
+    .slideshow-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.45s ease, background 0.4s ease;
+    }
+
+    /* ── Toolbar (top-right) ── */
+    .slideshow-toolbar {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 10;
+    }
+    .slideshow-exit {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 1.25rem;
+      cursor: pointer;
+      width: 2.25rem;
+      height: 2.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s, border-color 0.2s;
+      font-family: inherit;
+    }
+    .slideshow-exit:hover {
+      color: var(--text);
+      background: var(--bg-card-hover);
+      border-color: var(--border-light);
+    }
+
+    /* ── Slideshow quip ── */
+    .slideshow-quip {
+      position: absolute;
+      top: 1.4rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.78rem;
+      font-style: italic;
+      color: var(--text-dim);
+      z-index: 10;
+      white-space: nowrap;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease, color 0.4s ease;
+    }
+    .slideshow-quip.fade-out {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* ── Counter ── */
+    .slideshow-counter {
+      position: absolute;
+      bottom: 1.25rem;
+      right: 1.5rem;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      z-index: 10;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Keyboard hint ── */
+    .slideshow-hint {
+      position: absolute;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      opacity: 1;
+      transition: opacity 1.5s ease;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .slideshow-hint.faded { opacity: 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      section { padding: 4rem 1.25rem; }
+      .quip { display: none; }
+      .pipeline-step { grid-template-columns: 1fr; }
+      .step-number { margin-bottom: -0.5rem; }
+      .arch-flow { padding: 1.5rem; }
+      .arch-flow pre { font-size: 0.65rem; }
+      footer { flex-direction: column; gap: 0.5rem; }
+      .present-btn { display: none; }
+      .slideshow-slide { padding: 2rem 1.5rem; }
+      .slideshow-nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="inner">
+    <div class="logo"><span>truffles</span> / curiosity report</div>
+    <div class="nav-right">
+      <span class="quip" id="quip"></span>
+      <button class="present-btn" onclick="slideshow.enter()">Present</button>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 7.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section id="hero">
+  <div class="section-label">Curiosity Report</div>
+  <h1>Truffles</h1>
+  <p class="lead">
+    Autonomous bug detection and pull request generation.
+    PostHog session recordings in, GitHub PRs out.
+  </p>
+  <p class="hero-sub">
+    <span>Ammon Kunzler</span> &middot; CS 329 DevOps &middot; <a href="https://github.com/ammonwk/truffles" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">View on GitHub</a>
+  </p>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- Problem -->
+<section id="problem">
+  <div class="section-label">The Problem</div>
+  <h2>Manual QA doesn't scale</h2>
+  <p class="body" style="margin-bottom: 1.5rem;">
+    Session recording tools like PostHog generate thousands of replays. Teams record everything
+    but review almost nothing. Bugs hide in plain sight&mdash;visible in recordings that nobody
+    watches. The data exists. The human bandwidth doesn't.
+  </p>
+  <p class="body">
+    What if you could point an LLM at every session recording and have it detect UI bugs,
+    filter out noise, and then hand off the real issues to a coding agent that opens a PR?
+    That's Truffles.
+  </p>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- What it does -->
+<section id="what">
+  <div class="section-label">What It Does</div>
+  <h2>From session replay to merged PR</h2>
+  <div class="card-grid">
+    <div class="card">
+      <span class="icon">1</span>
+      <h3>Ingest</h3>
+      <p>Pulls session recordings from PostHog, renders rrweb events into MP4 video via a headless Chromium pipeline, and uploads to S3.</p>
+    </div>
+    <div class="card">
+      <span class="icon">2</span>
+      <h3>Analyze</h3>
+      <p>Dual-model vision analysis (Kimi K2.5 + Gemini 3 Pro) examines video frames. A separate model reviews console errors and network failures. Results are deduplicated and screened.</p>
+    </div>
+    <div class="card">
+      <span class="icon">3</span>
+      <h3>Fix</h3>
+      <p>Claude Code agents receive verified issues, check out isolated worktrees, locate the bug in code, implement fixes, and open PRs on GitHub&mdash;or report false alarms.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- Architecture -->
+<section id="architecture">
+  <div class="section-label">Architecture</div>
+  <h2>System overview</h2>
+  <p class="body" style="margin-bottom: 0.5rem;">
+    Turborepo monorepo. Express API handles orchestration, WebSocket streaming, and agent lifecycle.
+    React frontend provides real-time observability. Everything runs on a single process.
+  </p>
+  <div class="arch-flow">
+    <pre>
+  <span class="dim">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span class="dim">&#9474;</span>  <span class="hl">PostHog Cloud</span>                                                     <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>  session recordings (rrweb events, metadata, console logs)          <span class="dim">&#9474;</span>
+  <span class="dim">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                                 <span class="dim">&#9474;</span> <span class="dim">poll / sync</span>
+                                 <span class="dim">&#9660;</span>
+  <span class="dim">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span class="dim">&#9474;</span>  <span class="hl">Truffles API</span>  <span class="dim">(Express + WebSocket)</span>                                 <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>                                                                     <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>  <span class="ylw">ProcessingManager</span>    render rrweb &#8594; mp4 via Playwright + ffmpeg    <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>          <span class="dim">&#9474;</span>                                                            <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>          <span class="dim">&#9660;</span>                                                            <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>  <span class="ylw">AnalysisManager</span>      dual-model vision + session data analysis     <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>          <span class="dim">&#9474;</span>              deduplication + screening                       <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>          <span class="dim">&#9660;</span>                                                            <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>  <span class="ylw">AgentManager</span>         Claude Code SDK &#8594; worktree &#8594; code &#8594; PR        <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>                                                                     <span class="dim">&#9474;</span>
+  <span class="dim">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+           <span class="dim">&#9474;</span>                  <span class="dim">&#9474;</span>                    <span class="dim">&#9474;</span>
+           <span class="dim">&#9660;</span>                  <span class="dim">&#9660;</span>                    <span class="dim">&#9660;</span>
+     <span class="grn">MongoDB</span>           <span class="blu">AWS S3</span>             <span class="red">GitHub</span>
+     <span class="dim">sessions</span>          <span class="dim">videos</span>             <span class="dim">PRs on</span>
+     <span class="dim">issues</span>            <span class="dim">frames</span>             <span class="dim">target repo</span>
+     <span class="dim">agents</span>            <span class="dim">thumbnails</span>
+
+                                 <span class="dim">&#9474;</span>
+                                 <span class="dim">&#9660;</span>
+  <span class="dim">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span class="dim">&#9474;</span>  <span class="hl">Truffles Web</span>  <span class="dim">(React + WebSocket)</span>                                   <span class="dim">&#9474;</span>
+  <span class="dim">&#9474;</span>  sessions &#183; issues &#183; agent lab &#183; PR review &#183; dashboard              <span class="dim">&#9474;</span>
+  <span class="dim">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+    </pre>
+  </div>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- Pipeline -->
+<section id="pipeline">
+  <div class="section-label">The Pipeline</div>
+  <h2>Step by step</h2>
+
+  <div class="pipeline">
+
+    <!-- Step 1 -->
+    <div class="pipeline-step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>Session ingestion</h3>
+        <p>
+          PostHog sessions are synced into Truffles. The Sessions page lists all available
+          recordings with metadata&mdash;duration, user, active time. An admin selects sessions
+          to process.
+        </p>
+        <div class="screenshot">
+          <img class="img-dark" src="screenshots/sessions-dark.png" alt="Sessions list (dark)">
+          <img class="img-light" src="screenshots/sessions-light.png" alt="Sessions list (light)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="pipeline-step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>Video rendering &amp; analysis</h3>
+        <p>
+          rrweb events are replayed inside a headless Chromium browser, captured at 4x speed,
+          and encoded to MP4 via ffmpeg. Two vision models (Kimi K2.5, Gemini 3 Pro) examine
+          extracted frames while a separate text model reviews console errors and network failures.
+          Results are deduplicated against recent issues and screened through learned suppression
+          rules to filter noise.
+        </p>
+        <div class="screenshot">
+          <img class="img-dark" src="screenshots/session-detail-dark.png" alt="Session detail (dark)">
+          <img class="img-light" src="screenshots/session-detail-light.png" alt="Session detail (light)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="pipeline-step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h3>Issue triage</h3>
+        <p>
+          Verified issues are surfaced with severity levels (red for critical, yellow for minor),
+          LLM reasoning, and links back to the source session. Each issue includes the model's
+          explanation of what it found and why it matters.
+        </p>
+        <div class="screenshot">
+          <img class="img-dark" src="screenshots/issues-dark.png" alt="Issues list (dark)">
+          <img class="img-light" src="screenshots/issues-light.png" alt="Issues list (light)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="pipeline-step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <h3>Agent execution</h3>
+        <p>
+          A Claude Code agent receives the issue, checks out an isolated git worktree, and works through
+          phases: verify the bug exists in code, plan the fix, implement it, and run lint/typecheck.
+          If it can't find related code, it reports a false alarm instead of guessing. Output streams in
+          real time to the Agent Lab.
+        </p>
+        <div class="screenshot">
+          <img class="img-dark" src="screenshots/agents-dark.png" alt="Agent Lab (dark)">
+          <img class="img-light" src="screenshots/agents-light.png" alt="Agent Lab (light)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="pipeline-step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <h3>PR creation &amp; review</h3>
+        <p>
+          Successful agents create a pull request on the target repo with a clear description of the issue
+          and fix. The Truffles dashboard shows all PRs with inline diffs, issue context, and links
+          to GitHub for final human approval.
+        </p>
+        <div class="screenshot">
+          <img class="img-dark" src="screenshots/dashboard-dark.png" alt="Dashboard (dark)">
+          <img class="img-light" src="screenshots/dashboard-light.png" alt="Dashboard (light)">
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- Tech Stack -->
+<section id="tech">
+  <div class="section-label">Tech Stack</div>
+  <h2>What it's built with</h2>
+  <div class="tech-grid">
+    <div class="tech-item">
+      <div class="label">Frontend</div>
+      <div class="value">React + Vite + Tailwind</div>
+      <div class="detail">React Router, WebSocket, dark mode</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Backend</div>
+      <div class="value">Express + TypeScript</div>
+      <div class="detail">REST API, WebSocket streaming, in-process agents</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Database</div>
+      <div class="value">MongoDB + Mongoose</div>
+      <div class="detail">Sessions, issues, agent history, settings</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Video Pipeline</div>
+      <div class="value">Playwright + ffmpeg</div>
+      <div class="detail">rrweb replay in headless Chromium, MP4 encoding</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Vision Models</div>
+      <div class="value">Kimi K2.5 + Gemini 3 Pro</div>
+      <div class="detail">Via OpenRouter, multimodal frame analysis</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Reasoning</div>
+      <div class="value">Claude Opus 4.6</div>
+      <div class="detail">Screening, deduplication, session data analysis</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Code Agents</div>
+      <div class="value">Claude Code SDK</div>
+      <div class="detail">Agentic coding with tools, isolated worktrees</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Infrastructure</div>
+      <div class="value">AWS S3 + GitHub API</div>
+      <div class="detail">Video storage, PR creation, repo management</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Observability</div>
+      <div class="value">PostHog</div>
+      <div class="detail">Session recordings, console errors, network logs</div>
+    </div>
+    <div class="tech-item">
+      <div class="label">Monorepo</div>
+      <div class="value">Turborepo</div>
+      <div class="detail">Shared types, parallel builds, unified dev</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- DevOps Connection -->
+<section id="devops">
+  <div class="section-label">DevOps Connection</div>
+  <h2>Why this matters for QA &amp; DevOps</h2>
+  <div class="connection-grid">
+    <div class="connection-card">
+      <h3>Automated QA</h3>
+      <p>
+        Truffles replaces manual session review with LLM-powered analysis. It watches every
+        recording, not just the ones a human happens to check. This is the logical next step
+        beyond traditional automated testing&mdash;testing the actual user experience, not just
+        code paths.
+      </p>
+    </div>
+    <div class="connection-card">
+      <h3>CI/CD integration</h3>
+      <p>
+        Detected issues flow directly into the PR workflow. Agents create branches, implement fixes,
+        and open PRs with full context. The human role shifts from "find and fix" to "review and merge"&mdash;a
+        fundamentally different feedback loop.
+      </p>
+    </div>
+    <div class="connection-card">
+      <h3>Observability pipeline</h3>
+      <p>
+        PostHog session data (console errors, network failures, DOM events) feeds into a structured
+        analysis pipeline. This is production observability applied to QA&mdash;treating user sessions
+        as telemetry rather than debug artifacts.
+      </p>
+    </div>
+    <div class="connection-card">
+      <h3>False alarm management</h3>
+      <p>
+        The suppression rule system learns from mistakes. When an agent reports a false alarm, the
+        pattern is stored and used to filter future detections. This mirrors alert fatigue management
+        in production monitoring&mdash;a core DevOps discipline.
+      </p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- Learnings -->
+<section id="learnings">
+  <div class="section-label">What I Learned</div>
+  <h2>Reflections</h2>
+  <div class="learnings">
+    <div class="learning-item">
+      <h3>RRweb Video rendering is surprisingly hard</h3>
+      <p>
+        Replaying rrweb events in a headless browser, capturing frames, and encoding to MP4 required
+        handling browser lifecycle, timeline compression, memory limits, and timeout enforcement.
+        The rendering pipeline went through several iterations. 
+      </p>
+    </div>
+    <div class="learning-item">
+      <h3>LLM orchestration is a superpower</h3>
+      <p>
+        The individual API calls are simple. Chaining them into a reliable pipelines, with deduplication,
+        screening, false alarm detection, and agent handoffs, is where the real engineering lives.
+        Each stage needs clear contracts and failure modes.
+      </p>
+    </div>
+    <div class="learning-item">
+      <h3>Agents need escape hatches</h3>
+      <p>
+        Without an explicit "false alarm" option, coding agents will make speculative changes
+        to justify their existence.
+        Similarly, give agents a "Dev feedback" field to let them complain if you set them up for failure.
+      </p>
+    </div>
+    <div class="learning-item">
+      <h3>Multi-model analysis adds reliability</h3>
+      <p>
+        "State of the Art" is a constantly moving target with LLMs. Kimi K2.5 and Gemini 3 Pro both show excellent
+        vision benchmark results, I didn't know which would perform better.
+        I honestly never got around to seeing which I liked better, they're both still fighting with every video analyzed.
+      </p>
+    </div>
+    <div class="learning-item">
+      <h3>WebSocket streaming changes the UX</h3>
+      <p>
+        Watching an agent work in real time&mdash;seeing it read files, reason about the bug, and write
+        a fix&mdash;is fundamentally different from waiting for a result. Real-time observability made
+        debugging the agents themselves much faster. Also it gives me hope that I can turn it off before it goes too off the rails.
+        Realistically, nobody will be watching it when something goes wrong, and I'll have to live with the YOLO permissions I gave it.
+      </p>
+    </div>
+    <div class="learning-item">
+      <h3>Worktree isolation is essential</h3>
+      <p>
+        Running multiple coding agents concurrently requires complete filesystem isolation. Git worktrees
+        solved this elegantly&mdash;each agent gets its own checkout of the repo on its own branch,
+        with automatic cleanup of orphaned worktrees. Ports still might fight if they try to run their code,
+        I haven't solved that problem yet.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <span>Ammon Kunzler &middot; CS 329 &middot; 2026</span>
+  <a href="https://github.com/ammonwk" target="_blank" rel="noopener">github.com/ammonwk</a>
+</footer>
+
+<script>
+  /* ── Theme toggle ── */
+  function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }
+
+  const saved = localStorage.getItem('theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+  /* ── Rotating quips ── */
+  const QUIPS = [
+    'PRs appear. Nobody knows why. Velocity is up 300%',
+    'Turning user suffering into pull requests since 2026',
+    'Three LLMs in a trenchcoat',
+    'We automated the part where you ignore the bug report',
+    'What if QA but it\u2019s just vibes and GPUs',
+    'Powered by several very confident language models',
+    'Works on my machine',
+    'Move fast, break things, let Claude clean up',
+    'Reduce churn by hiding the x button',
+    'The best way to find bugs is to let someone else find them',
+    'Have you tried turning it off and on again',
+  ];
+  (function initQuips() {
+    const el = document.getElementById('quip');
+    if (!el) return;
+    let i = 0;
+    el.textContent = QUIPS[0];
+    setInterval(() => {
+      el.classList.add('fade-out');
+      setTimeout(() => {
+        i = (i + 1) % QUIPS.length;
+        el.textContent = QUIPS[i];
+        el.classList.remove('fade-out');
+      }, 400);
+    }, 4500);
+  })();
+
+  /* ── Slideshow ── */
+  const slideshow = {
+    overlay: null,
+    slides: [],
+    current: 0,
+    _keyHandler: null,
+
+    enter() {
+      const sources = [
+        { el: document.querySelector('#hero'), type: 'hero' },
+        { el: document.querySelector('#problem'), type: 'section' },
+        { el: document.querySelector('#what'), type: 'section' },
+        { el: document.querySelector('#architecture'), type: 'section' },
+        ...Array.from(document.querySelectorAll('#pipeline .pipeline-step')).map(el => ({ el, type: 'step' })),
+        { el: document.querySelector('#tech'), type: 'section' },
+        { el: document.querySelector('#devops'), type: 'section' },
+        { el: document.querySelector('#learnings'), type: 'section' },
+      ];
+
+      this.overlay = document.createElement('div');
+      this.overlay.id = 'slideshow';
+
+      const viewport = document.createElement('div');
+      viewport.className = 'slideshow-viewport';
+
+      sources.forEach((src, i) => {
+        const slide = document.createElement('div');
+        slide.className = 'slideshow-slide slide-' + src.type + (i === 0 ? ' active' : '');
+
+        const inner = document.createElement('div');
+        inner.className = 'slide-inner';
+
+        if (src.type === 'step') {
+          const stepNum = src.el.querySelector('.step-number').textContent.trim();
+          const stepContent = src.el.querySelector('.step-content');
+          const clone = stepContent.cloneNode(true);
+
+          const oldH3 = clone.querySelector('h3');
+          const h2 = document.createElement('h2');
+          h2.textContent = oldH3.textContent;
+          oldH3.replaceWith(h2);
+
+          const label = document.createElement('div');
+          label.className = 'step-label';
+          label.textContent = 'Step ' + stepNum;
+
+          inner.appendChild(label);
+          while (clone.firstChild) inner.appendChild(clone.firstChild);
+        } else {
+          inner.innerHTML = src.el.innerHTML;
+        }
+
+        slide.appendChild(inner);
+        viewport.appendChild(slide);
+      });
+
+      // Navigation arrows
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'slideshow-nav prev disabled';
+      prevBtn.innerHTML = '\u2190';
+      prevBtn.onclick = () => this.prev();
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'slideshow-nav next';
+      nextBtn.innerHTML = '\u2192';
+      nextBtn.onclick = () => this.next();
+
+      // Toolbar (theme toggle + exit)
+      const toolbar = document.createElement('div');
+      toolbar.className = 'slideshow-toolbar';
+
+      const themeBtn = document.createElement('button');
+      themeBtn.className = 'theme-toggle';
+      themeBtn.setAttribute('aria-label', 'Toggle theme');
+      themeBtn.onclick = toggleTheme;
+      themeBtn.innerHTML =
+        '<svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 7.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>' +
+        '<svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>';
+
+      const exitBtn = document.createElement('button');
+      exitBtn.className = 'slideshow-exit';
+      exitBtn.innerHTML = '\u00d7';
+      exitBtn.onclick = () => this.exit();
+
+      toolbar.appendChild(themeBtn);
+      toolbar.appendChild(exitBtn);
+
+      // Counter
+      const counter = document.createElement('div');
+      counter.className = 'slideshow-counter';
+      counter.textContent = '1 / ' + sources.length;
+
+      // Hint
+      const hint = document.createElement('div');
+      hint.className = 'slideshow-hint';
+      hint.textContent = 'Arrow keys or click to navigate \u00b7 Esc to exit';
+      setTimeout(() => hint.classList.add('faded'), 3000);
+
+      // Progress bar
+      const progress = document.createElement('div');
+      progress.className = 'slideshow-progress';
+      const progressBar = document.createElement('div');
+      progressBar.className = 'slideshow-progress-bar';
+      progressBar.style.width = (100 / sources.length) + '%';
+      progress.appendChild(progressBar);
+
+      // Slideshow quip
+      const slideQuip = document.createElement('div');
+      slideQuip.className = 'slideshow-quip';
+      slideQuip.textContent = QUIPS[Math.floor(Math.random() * QUIPS.length)];
+      let slideQuipIndex = QUIPS.indexOf(slideQuip.textContent);
+      this._quipInterval = setInterval(() => {
+        slideQuip.classList.add('fade-out');
+        setTimeout(() => {
+          slideQuipIndex = (slideQuipIndex + 1) % QUIPS.length;
+          slideQuip.textContent = QUIPS[slideQuipIndex];
+          slideQuip.classList.remove('fade-out');
+        }, 400);
+      }, 4500);
+
+      viewport.appendChild(prevBtn);
+      viewport.appendChild(nextBtn);
+      viewport.appendChild(toolbar);
+      viewport.appendChild(slideQuip);
+      viewport.appendChild(counter);
+      viewport.appendChild(hint);
+
+      this.overlay.appendChild(viewport);
+      this.overlay.appendChild(progress);
+
+      document.body.appendChild(this.overlay);
+      document.documentElement.classList.add('slideshow-active');
+
+      this.slides = viewport.querySelectorAll('.slideshow-slide');
+      this.current = 0;
+
+      this._keyHandler = (e) => this.handleKey(e);
+      document.addEventListener('keydown', this._keyHandler);
+
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    },
+
+    exit() {
+      document.documentElement.classList.remove('slideshow-active');
+      if (this.overlay) {
+        this.overlay.remove();
+        this.overlay = null;
+      }
+      if (this._keyHandler) {
+        document.removeEventListener('keydown', this._keyHandler);
+        this._keyHandler = null;
+      }
+      if (this._quipInterval) {
+        clearInterval(this._quipInterval);
+        this._quipInterval = null;
+      }
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    },
+
+    goTo(index) {
+      if (index < 0 || index >= this.slides.length) return;
+      this.slides[this.current].classList.remove('active');
+      this.current = index;
+      this.slides[this.current].classList.add('active');
+      this.slides[this.current].scrollTop = 0;
+
+      const counter = this.overlay.querySelector('.slideshow-counter');
+      counter.textContent = (this.current + 1) + ' / ' + this.slides.length;
+
+      const bar = this.overlay.querySelector('.slideshow-progress-bar');
+      bar.style.width = ((this.current + 1) / this.slides.length * 100) + '%';
+
+      const prev = this.overlay.querySelector('.slideshow-nav.prev');
+      const next = this.overlay.querySelector('.slideshow-nav.next');
+      prev.classList.toggle('disabled', this.current === 0);
+      next.classList.toggle('disabled', this.current === this.slides.length - 1);
+    },
+
+    next() { this.goTo(this.current + 1); },
+    prev() { this.goTo(this.current - 1); },
+
+    handleKey(e) {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.next();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.prev();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.exit();
+      }
+    }
+  };
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && document.documentElement.classList.contains('slideshow-active')) {
+      slideshow.exit();
+    }
+  });
+</script>
+
+</body>
+</html>
