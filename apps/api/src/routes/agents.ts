@@ -24,6 +24,19 @@ export function createAgentRouter(manager: AgentManager): Router {
     }
   });
 
+  // List completed agent sessions — read-only, no auth
+  router.get('/history', async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
+      const result = await manager.getHistory(limit, offset);
+      res.json(result);
+    } catch (err) {
+      console.error('[agents] history error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // List active agents and queue — read-only, no auth
   router.get('/', async (_req, res) => {
     try {

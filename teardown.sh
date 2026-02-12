@@ -7,11 +7,12 @@
 #   - EBS root volume vol-03ef056b84e5d2827 (50GB gp3, auto-deletes with instance)
 #   - Elastic IP eipalloc-0d44bbcf31a420cf2 (3.233.77.154)
 #   - Security group sg-0aa9edc0e794b6030 (truffles-sg)
-#   - S3 bucket truffles-recordings (all objects + bucket)
 #   - Route53 A record for truffles.ammonkunzler.com
 #   - Cloudflare DNS A record for truffles.ammonkunzler.com
 #
-# Resources NOT touched (pre-existing):
+# Resources NOT touched (intentionally preserved):
+#   - S3 bucket truffles-recordings (kept for data retention)
+#   - MongoDB (external, not affected)
 #   - Route53 hosted zone for ammonkunzler.com
 #   - Any other EC2 instances, EIPs, S3 buckets, etc.
 #
@@ -51,11 +52,12 @@ echo "  EC2 instance:     ${EC2_INSTANCE_ID} (t3.xlarge)"
 echo "  EBS volume:       ${EBS_VOLUME_ID} (50GB gp3, auto-deletes)"
 echo "  Elastic IP:       ${EIP_ALLOC_ID} (3.233.77.154)"
 echo "  Security group:   ${SECURITY_GROUP_ID} (truffles-sg)"
-echo "  S3 bucket:        s3://${S3_BUCKET} (ALL contents deleted)"
 echo "  Route53 record:   truffles.ammonkunzler.com A record"
 echo "  Cloudflare record: truffles.ammonkunzler.com A record"
 echo ""
-echo -e "${YELLOW}There is no undo. MongoDB data on the instance will be lost.${NC}"
+echo -e "${GREEN}Preserved: S3 bucket (s3://${S3_BUCKET}), MongoDB${NC}"
+echo ""
+echo -e "${YELLOW}There is no undo for the resources listed above.${NC}"
 echo ""
 echo -n "Type 'nuke-it' to confirm: "
 read -r CONFIRM
@@ -72,7 +74,7 @@ echo ""
 ERRORS=()
 
 # ── 1. Terminate EC2 instance ────────────────────────────────────────
-echo -n "[1/7] Terminating EC2 instance ${EC2_INSTANCE_ID}..."
+echo -n "[1/6] Terminating EC2 instance ${EC2_INSTANCE_ID}..."
 if aws ec2 terminate-instances --instance-ids "${EC2_INSTANCE_ID}" --output json > /dev/null 2>&1; then
   echo -e " ${GREEN}done${NC}"
 else
@@ -81,7 +83,7 @@ else
 fi
 
 # ── 2. Wait for instance to terminate ────────────────────────────────
-echo -n "[2/7] Waiting for instance to terminate (this takes ~60s)..."
+echo -n "[2/6] Waiting for instance to terminate (this takes ~60s)..."
 if aws ec2 wait instance-terminated --instance-ids "${EC2_INSTANCE_ID}" 2>/dev/null; then
   echo -e " ${GREEN}done${NC}"
 else
@@ -101,7 +103,7 @@ else
 fi
 
 # ── 3. Release Elastic IP ────────────────────────────────────────────
-echo -n "[3/7] Disassociating and releasing Elastic IP..."
+echo -n "[3/6] Disassociating and releasing Elastic IP..."
 aws ec2 disassociate-address --association-id "${EIP_ASSOC_ID}" 2>/dev/null || true
 if aws ec2 release-address --allocation-id "${EIP_ALLOC_ID}" 2>/dev/null; then
   echo -e " ${GREEN}done${NC}"
@@ -111,7 +113,7 @@ else
 fi
 
 # ── 4. Delete security group ─────────────────────────────────────────
-echo -n "[4/7] Deleting security group ${SECURITY_GROUP_ID}..."
+echo -n "[4/6] Deleting security group ${SECURITY_GROUP_ID}..."
 if aws ec2 delete-security-group --group-id "${SECURITY_GROUP_ID}" 2>/dev/null; then
   echo -e " ${GREEN}done${NC}"
 else
@@ -119,17 +121,8 @@ else
   ERRORS+=("Security group deletion failed — retry after instance is fully gone: aws ec2 delete-security-group --group-id ${SECURITY_GROUP_ID}")
 fi
 
-# ── 5. Empty and delete S3 bucket ────────────────────────────────────
-echo -n "[5/7] Emptying and deleting S3 bucket s3://${S3_BUCKET}..."
-if aws s3 rb "s3://${S3_BUCKET}" --force 2>/dev/null; then
-  echo -e " ${GREEN}done${NC}"
-else
-  echo -e " ${YELLOW}may already be deleted or empty${NC}"
-  ERRORS+=("S3 bucket deletion may have failed — verify: aws s3 ls s3://${S3_BUCKET}")
-fi
-
-# ── 6. Delete Route53 record ─────────────────────────────────────────
-echo -n "[6/7] Deleting Route53 A record for truffles.ammonkunzler.com..."
+# ── 5. Delete Route53 record ─────────────────────────────────────────
+echo -n "[5/6] Deleting Route53 A record for truffles.ammonkunzler.com..."
 if aws route53 change-resource-record-sets \
   --hosted-zone-id "${ROUTE53_ZONE_ID}" \
   --change-batch '{
@@ -149,8 +142,8 @@ else
   ERRORS+=("Route53 record deletion may have failed — check manually")
 fi
 
-# ── 7. Delete Cloudflare DNS record ──────────────────────────────────
-echo -n "[7/7] Deleting Cloudflare DNS record for truffles.ammonkunzler.com..."
+# ── 6. Delete Cloudflare DNS record ──────────────────────────────────
+echo -n "[6/6] Deleting Cloudflare DNS record for truffles.ammonkunzler.com..."
 CF_TOKEN="${CLOUDFLARE_API_TOKEN:-}"
 if [[ -z "${CF_TOKEN}" ]]; then
   echo ""
@@ -193,6 +186,5 @@ else
   echo "Quick verification commands:"
   echo "  aws ec2 describe-instances --instance-ids ${EC2_INSTANCE_ID} --query 'Reservations[0].Instances[0].State.Name' --output text"
   echo "  aws ec2 describe-addresses --allocation-ids ${EIP_ALLOC_ID} 2>&1"
-  echo "  aws s3 ls s3://${S3_BUCKET} 2>&1"
   echo "  aws ec2 describe-security-groups --group-ids ${SECURITY_GROUP_ID} 2>&1"
 fi

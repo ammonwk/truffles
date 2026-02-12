@@ -109,3 +109,4 @@ export * from './types/issue';
 export * from './types/settings';
 export * from './types/suppression';
 export * from './types/analysis';
+export * from './types/dashboard';

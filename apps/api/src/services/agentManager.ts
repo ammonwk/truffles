@@ -5,6 +5,7 @@ import type {
   AgentStartResponse,
   AgentStreamEvent,
   AgentListResponse,
+  AgentHistoryResponse,
   AgentSessionDoc,
 } from '@truffles/shared';
 import { WorktreeManager } from './worktreeManager.js';
@@ -13,6 +14,7 @@ import { runAgent } from './claudeAgent.js';
 interface ActiveAgent {
   abortController: AbortController;
   worktreePath: string;
+  branchName: string;
   timeout: NodeJS.Timeout;
 }
 
@@ -122,7 +124,7 @@ export class AgentManager {
       abortController.abort();
     }, this.timeoutMinutes * 60 * 1000);
 
-    this.active.set(sessionId, { abortController, worktreePath, timeout });
+    this.active.set(sessionId, { abortController, worktreePath, branchName, timeout });
 
     this.broadcast({
       type: 'agent:started',
@@ -138,6 +140,7 @@ export class AgentManager {
         issueTitle: request.issueTitle,
         issueDescription: request.issueDescription,
         severity: request.severity,
+        screenshotUrl: request.screenshotUrl,
         sessionContext: request.sessionContext,
         githubRepo: this.githubRepo,
         abortController,
@@ -221,7 +224,7 @@ export class AgentManager {
         error: result.error,
       });
 
-      // Update the linked Issue with PR info
+      // Update the linked Issue with PR info and enrich PR body with screenshot
       if (result.prUrl && result.prNumber) {
         const agentDoc = await AgentSession.findById(sessionId).lean();
         if (agentDoc?.issueId) {
@@ -231,6 +234,17 @@ export class AgentManager {
             prUrl: result.prUrl,
             agentSessionId: sessionId,
           });
+
+          // Enrich PR body with screenshot if available
+          if (request.screenshotUrl) {
+            await enrichPrWithScreenshot(
+              this.githubRepo,
+              result.prNumber,
+              request.screenshotUrl,
+            ).catch((err) => {
+              console.warn(`[agent-manager] failed to enrich PR #${result.prNumber} with screenshot:`, err);
+            });
+          }
         }
       }
 
@@ -275,8 +289,8 @@ export class AgentManager {
       this.pendingLogs.delete(sessionId);
       this.flushDeltaBuffer(sessionId);
 
-      // Cleanup worktree
-      this.worktreeManager.removeWorktree(worktreePath).catch((err) => {
+      // Cleanup worktree and branch
+      this.worktreeManager.removeWorktree(worktreePath, branchName).catch((err) => {
         console.warn(`[agent-manager] worktree cleanup failed for ${sessionId}:`, err);
       });
 
@@ -302,8 +316,8 @@ export class AgentManager {
     entry.abortController.abort();
     clearTimeout(entry.timeout);
 
-    // Cleanup worktree
-    await this.worktreeManager.removeWorktree(entry.worktreePath).catch(() => {});
+    // Cleanup worktree and branch
+    await this.worktreeManager.removeWorktree(entry.worktreePath, entry.branchName).catch(() => {});
 
     await AgentSession.findByIdAndUpdate(sessionId, {
       status: 'failed',
@@ -401,6 +415,38 @@ export class AgentManager {
     };
   }
 
+  async getHistory(limit: number, offset: number): Promise<AgentHistoryResponse> {
+    const terminalStatuses = ['done', 'failed', 'false_alarm'];
+    const [docs, total] = await Promise.all([
+      AgentSession.find({ status: { $in: terminalStatuses } })
+        .sort({ completedAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .select('-outputLog')
+        .lean(),
+      AgentSession.countDocuments({ status: { $in: terminalStatuses } }),
+    ]);
+
+    return {
+      sessions: docs.map((doc) => ({
+        _id: doc._id.toString(),
+        issueId: doc.issueId.toString(),
+        status: doc.status as AgentPhase,
+        branchName: doc.branchName ?? '',
+        startedAt: doc.startedAt?.toISOString() ?? new Date().toISOString(),
+        completedAt: doc.completedAt?.toISOString(),
+        filesModified: doc.filesModified ?? [],
+        error: doc.error ?? undefined,
+        prNumber: doc.prNumber ?? undefined,
+        prUrl: doc.prUrl ?? undefined,
+        falseAlarmReason: doc.falseAlarmReason ?? undefined,
+        costUsd: doc.costUsd ?? undefined,
+      })),
+      total,
+      hasMore: offset + limit < total,
+    };
+  }
+
   async shutdown(): Promise<void> {
     clearInterval(this.flushInterval);
 
@@ -484,4 +530,56 @@ export class AgentManager {
       console.warn(`[agent-manager] failed to flush logs for ${sessionId}:`, err);
     }
   }
+}
+
+/**
+ * Update a GitHub PR body to include a screenshot image.
+ * Fetches the current body, appends the screenshot if not already present.
+ */
+export async function enrichPrWithScreenshot(
+  githubRepo: string,
+  prNumber: number,
+  screenshotUrl: string,
+): Promise<void> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    console.warn('[enrich-pr] GITHUB_TOKEN not set, skipping PR enrichment');
+    return;
+  }
+
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'truffles-api',
+    'Content-Type': 'application/json',
+  };
+
+  // Fetch current PR body
+  const prRes = await fetch(`https://api.github.com/repos/${githubRepo}/pulls/${prNumber}`, { headers });
+  if (!prRes.ok) {
+    throw new Error(`Failed to fetch PR #${prNumber}: ${prRes.status}`);
+  }
+  const prData = await prRes.json() as { body?: string };
+  const currentBody = prData.body ?? '';
+
+  // Skip if screenshot is already in the body
+  if (currentBody.includes(screenshotUrl)) {
+    return;
+  }
+
+  const screenshotSection = `\n\n---\n\n**Screenshot of the error:**\n\n![Issue Screenshot](${screenshotUrl})`;
+  const newBody = currentBody + screenshotSection;
+
+  // Update PR body
+  const updateRes = await fetch(`https://api.github.com/repos/${githubRepo}/pulls/${prNumber}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ body: newBody }),
+  });
+
+  if (!updateRes.ok) {
+    throw new Error(`Failed to update PR #${prNumber} body: ${updateRes.status}`);
+  }
+
+  console.log(`[enrich-pr] added screenshot to PR #${prNumber}`);
 }

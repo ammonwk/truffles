@@ -35,6 +35,7 @@ export async function runAgent(opts: {
   issueTitle: string;
   issueDescription: string;
   severity: string;
+  screenshotUrl?: string;
   sessionContext?: { consoleErrors?: string[]; networkFailures?: string[]; userEmail?: string };
   githubRepo: string;
   abortController: AbortController;
@@ -177,10 +178,25 @@ function buildPrompt(opts: {
   issueTitle: string;
   issueDescription: string;
   severity: string;
+  screenshotUrl?: string;
   sessionContext?: { consoleErrors?: string[]; networkFailures?: string[]; userEmail?: string };
   githubRepo: string;
   branchName: string;
 }): string {
+  const screenshotSection = opts.screenshotUrl
+    ? `\n\n## Screenshot\n![Issue Screenshot](${opts.screenshotUrl})`
+    : '';
+
+  const prBody = [
+    'Automated fix by Truffles.',
+    '',
+    `**Issue:** ${opts.issueDescription}`,
+    opts.screenshotUrl ? `\n**Screenshot of the error:**\n\n![Issue Screenshot](${opts.screenshotUrl})` : '',
+  ].filter(Boolean).join('\n');
+
+  // Escape backticks and dollar signs in the PR body for shell safety
+  const escapedPrBody = prBody.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
   return `
 You are fixing a UI issue in the ${opts.githubRepo} codebase.
 
@@ -209,7 +225,7 @@ ${opts.sessionContext?.networkFailures?.length
    - git add the changed files
    - git commit -m "[Truffles] Fix: ${opts.issueTitle}"
    - git push -u origin ${opts.branchName}
-   - gh pr create --title "[Truffles] Fix: ${opts.issueTitle}" --body "Automated fix by Truffles. Issue: ${opts.issueDescription}" --label truffles-autofix
+   - gh pr create --title "[Truffles] Fix: ${opts.issueTitle}" --body "${escapedPrBody}" --label truffles-autofix
 
 CRITICAL: If you cannot find code related to this issue, report TRUFFLES_FALSE_ALARM. Do NOT make speculative changes.
 `.trim();

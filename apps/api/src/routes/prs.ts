@@ -1,5 +1,12 @@
 import { Router, type Request, type Response } from 'express';
-import { Issue } from '@truffles/db';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
+import { Issue, Session } from '@truffles/db';
+import { requireAdmin } from '../middleware/auth.js';
+import { getPresignedUrl, uploadBufferAndGetUrl } from '../services/s3.js';
+import { extractFrames, downloadVideoFromS3 } from '../services/frameExtractor.js';
+import { enrichPrWithScreenshot } from '../services/agentManager.js';
 
 export const prsRouter = Router();
 
@@ -70,5 +77,88 @@ prsRouter.get('/api/prs/:number', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[prs] detail error:', err);
     res.status(500).json({ error: 'Failed to fetch PR' });
+  }
+});
+
+// POST /api/prs/backfill-screenshots — extract frames for existing PRs and update their bodies
+prsRouter.post('/api/prs/backfill-screenshots', requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    // Find issues that have a PR but no screenshot URLs
+    const issues = await Issue.find({
+      prNumber: { $ne: null },
+      $or: [
+        { videoFrameUrls: { $exists: false } },
+        { videoFrameUrls: { $size: 0 } },
+      ],
+    }).lean();
+
+    if (issues.length === 0) {
+      res.json({ message: 'No PRs need backfilling', updated: 0 });
+      return;
+    }
+
+    const results: Array<{ issueId: string; prNumber: number; status: string; error?: string }> = [];
+
+    for (const issue of issues) {
+      const prNumber = issue.prNumber as number;
+      const issueId = issue._id.toString();
+
+      try {
+        // Find the session to get the video
+        const session = await Session.findById(issue.sessionId).lean();
+        if (!session?.videoUrl) {
+          results.push({ issueId, prNumber, status: 'skipped', error: 'No video available' });
+          continue;
+        }
+
+        // Download video and extract the frame at the issue's timestamp
+        const tmpVideoPath = path.join(os.tmpdir(), `truffles-backfill-${Date.now()}.mp4`);
+        try {
+          const presignedUrl = await getPresignedUrl(session.videoUrl);
+          await downloadVideoFromS3(presignedUrl, tmpVideoPath);
+
+          // Extract frames the same way as video analysis (every 5s, max 20)
+          const frames = await extractFrames(tmpVideoPath, 5, 20);
+
+          // Find the best frame for this issue's timestamp
+          const targetFrameIndex = Math.round((issue.timestampSec ?? 0) / 5);
+          const frameIndex = Math.min(Math.max(targetFrameIndex, 0), frames.length - 1);
+
+          if (frames.length === 0) {
+            results.push({ issueId, prNumber, status: 'skipped', error: 'No frames extracted' });
+            continue;
+          }
+
+          const frame = frames[frameIndex];
+          const sessionId = issue.sessionId.toString();
+          const s3Key = `sessions/${sessionId}/frames/frame-${String(frameIndex).padStart(4, '0')}.jpg`;
+
+          const screenshotUrl = await uploadBufferAndGetUrl(s3Key, Buffer.from(frame.base64, 'base64'), 'image/jpeg');
+
+          // Update Issue with the screenshot URL
+          await Issue.findByIdAndUpdate(issueId, {
+            videoFrameUrls: [screenshotUrl],
+          });
+
+          // Update the PR body on GitHub
+          await enrichPrWithScreenshot(GITHUB_REPO, prNumber, screenshotUrl);
+
+          results.push({ issueId, prNumber, status: 'updated' });
+        } finally {
+          if (fs.existsSync(tmpVideoPath)) {
+            fs.unlinkSync(tmpVideoPath);
+          }
+        }
+      } catch (err) {
+        console.error(`[backfill] failed for issue ${issueId} / PR #${prNumber}:`, err);
+        results.push({ issueId, prNumber, status: 'error', error: String(err) });
+      }
+    }
+
+    const updated = results.filter((r) => r.status === 'updated').length;
+    res.json({ message: `Backfilled ${updated}/${issues.length} PRs`, results });
+  } catch (err) {
+    console.error('[prs] backfill error:', err);
+    res.status(500).json({ error: 'Backfill failed' });
   }
 });

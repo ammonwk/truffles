@@ -4,14 +4,21 @@ import fs from 'node:fs';
 import type { DetectedIssue, VideoAnalysisResult } from '@truffles/shared';
 import { analyzeVideoFrames } from './openrouter.js';
 import { extractFrames, downloadVideoFromS3 } from './frameExtractor.js';
-import { getPresignedUrl } from './s3.js';
+import { getPresignedUrl, uploadBufferAndGetUrl } from './s3.js';
 import { buildVideoAnalysisPrompt } from '../prompts/videoAnalysis.js';
+
+export interface VideoAnalysisWithFrames {
+  primary: VideoAnalysisResult;
+  secondary: VideoAnalysisResult;
+  frameUrls: Map<number, string>;
+}
 
 export async function analyzeSessionVideo(
   videoS3Key: string,
   sessionDurationSec: number,
   models: { primary: string; secondary: string },
-): Promise<{ primary: VideoAnalysisResult; secondary: VideoAnalysisResult }> {
+  sessionId: string,
+): Promise<VideoAnalysisWithFrames> {
   // Download video to temp
   const tmpVideoPath = path.join(os.tmpdir(), `truffles-video-${Date.now()}.mp4`);
 
@@ -26,6 +33,7 @@ export async function analyzeSessionVideo(
       return {
         primary: { issues: [], model: models.primary, durationMs: 0 },
         secondary: { issues: [], model: models.secondary, durationMs: 0 },
+        frameUrls: new Map(),
       };
     }
 
@@ -38,9 +46,31 @@ export async function analyzeSessionVideo(
       runVideoModel(models.secondary, framePayloads, prompt),
     ]);
 
+    // Collect all frameIndex values referenced by detected issues
+    const referencedFrameIndices = new Set<number>();
+    for (const issue of [...primaryResult.issues, ...secondaryResult.issues]) {
+      if (issue.frameIndex != null && issue.frameIndex >= 0 && issue.frameIndex < frames.length) {
+        referencedFrameIndices.add(issue.frameIndex);
+      }
+    }
+
+    // Upload only the referenced frames to S3 with public-read
+    const frameUrls = new Map<number, string>();
+    for (const idx of referencedFrameIndices) {
+      const frame = frames[idx];
+      const key = `sessions/${sessionId}/frames/frame-${String(idx).padStart(4, '0')}.jpg`;
+      try {
+        const url = await uploadBufferAndGetUrl(key, Buffer.from(frame.base64, 'base64'), 'image/jpeg');
+        frameUrls.set(idx, url);
+      } catch (err) {
+        console.warn(`[video-analysis] failed to upload frame ${idx} to S3:`, err);
+      }
+    }
+
     return {
       primary: { ...primaryResult, model: models.primary },
       secondary: { ...secondaryResult, model: models.secondary },
+      frameUrls,
     };
   } finally {
     if (fs.existsSync(tmpVideoPath)) {

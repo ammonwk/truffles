@@ -676,6 +676,28 @@ body {
   }
 }
 
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dashboard-card-hero {
+  height: 10rem;
+  width: 100%;
+  object-fit: cover;
+}
+
+.dashboard-card-hero-placeholder {
+  height: 10rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--surface-soft), var(--surface-raised));
+}
+
 /* Light theme utility remaps for Tailwind classes used in App.tsx */
 :root[data-theme='light'] .bg-slate-950 {
   background-color: #f3f6f8 !important;

@@ -81,6 +81,39 @@ export async function deleteSessionFiles(sessionId: string): Promise<void> {
   );
 }
 
+export async function uploadBuffer(
+  key: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<void> {
+  const client = getS3Client();
+  const bucket = getBucket();
+
+  await client.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
+}
+
+/** Max presigned URL duration: 7 days (SigV4 limit) */
+const SCREENSHOT_EXPIRY = 7 * 24 * 60 * 60;
+
+/**
+ * Upload a buffer to S3 and return a long-lived presigned URL (7 days).
+ * GitHub's Camo image proxy caches on first fetch, so the image persists
+ * in PRs even after the presigned URL expires.
+ */
+export async function uploadBufferAndGetUrl(
+  key: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<string> {
+  await uploadBuffer(key, buffer, contentType);
+  return getPresignedUrl(key, SCREENSHOT_EXPIRY);
+}
+
 export function getS3Key(
   sessionId: string,
   filename: string,

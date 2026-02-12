@@ -31,6 +31,7 @@ import {
   Video,
   RefreshCw,
   Wrench,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -43,9 +44,10 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import type { PostHogSessionSummary, SessionSummary, SessionDetail, IssueSummary, IssueDetail as IssueDetailType, IssueStatus, Severity, SuppressionRuleDoc, AgentPhase, AgentSessionDoc } from '@truffles/shared';
+import type { PostHogSessionSummary, SessionSummary, SessionDetail, IssueSummary, IssueDetail as IssueDetailType, IssueStatus, Severity, SuppressionRuleDoc, AgentPhase, AgentSessionDoc, AgentHistorySummary, DashboardPRCard } from '@truffles/shared';
 import {
   fetchAgentDetail,
+  fetchAgentHistory,
   fetchAgentList,
   fetchPostHogSessions,
   triggerPostHogSync,
@@ -65,8 +67,8 @@ import {
   fetchPRDetail,
   reprocessSession,
   cancelProcessing,
-  fetchIdentity,
   retryIssue,
+  fetchDashboardPRs,
   type PRDetail,
 } from './api';
 import { useAgentWebSocket } from './useAgentWebSocket';
@@ -235,7 +237,8 @@ function RotatingQuip() {
 
 function AppNav({ theme, onToggleTheme }: { theme: ThemeMode; onToggleTheme: () => void }) {
   const navItems = [
-    { to: '/welcome', label: 'Welcome', icon: Home },
+    { to: '/welcome', label: 'Home', icon: Home },
+    { to: '/dashboard', label: 'Dashboard', icon: GitPullRequest },
     { to: '/sessions', label: 'Sessions', icon: Video },
     { to: '/issues', label: 'Issues', icon: AlertCircle },
     { to: '/agents', label: 'Agent Lab', icon: Bot },
@@ -305,23 +308,248 @@ function AppNav({ theme, onToggleTheme }: { theme: ThemeMode; onToggleTheme: () 
   );
 }
 
-function WelcomePage() {
-  const [greeting, setGreeting] = useState<string>('Welcome!');
+function PRDashboardPage() {
+  const navigate = useNavigate();
+  const [cards, setCards] = useState<DashboardPRCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'red' | 'yellow'>('all');
+  const [prStatusFilter, setPrStatusFilter] = useState<'all' | 'open' | 'merged'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const loadCards = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchDashboardPRs({
+        severity: severityFilter,
+        prStatus: prStatusFilter,
+      });
+      setCards(data.cards);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }, [severityFilter, prStatusFilter]);
 
   useEffect(() => {
-    fetchIdentity()
-      .then(({ name }) => {
-        if (name) setGreeting(`Hey there, ${name}`);
-      })
-      .catch(() => {});
-  }, []);
+    loadCards();
+  }, [loadCards]);
 
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return cards;
+    const q = searchQuery.toLowerCase();
+    return cards.filter(
+      (c) =>
+        c.issueTitle.toLowerCase().includes(q) ||
+        c.issueDescription.toLowerCase().includes(q) ||
+        c.prTitle.toLowerCase().includes(q) ||
+        String(c.prNumber).includes(q),
+    );
+  }, [cards, searchQuery]);
+
+  const severityOptions = [
+    { value: 'all' as const, label: 'All' },
+    { value: 'red' as const, label: 'Red' },
+    { value: 'yellow' as const, label: 'Yellow' },
+  ];
+
+  const prStatusOptions = [
+    { value: 'all' as const, label: 'All' },
+    { value: 'open' as const, label: 'Open' },
+    { value: 'merged' as const, label: 'Merged' },
+  ];
+
+  return (
+    <section className="animate-rise space-y-5">
+      <div>
+        <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-tertiary)]">Dashboard</p>
+        <h2 className="flex items-center gap-2 text-[24px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+          <GitPullRequest size={20} className="text-[var(--accent)]" />
+          Pull Requests
+        </h2>
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="segmented-control">
+          {severityOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={cn(
+                'segmented-control-item',
+                severityFilter === opt.value && 'segmented-control-item-active',
+              )}
+              onClick={() => setSeverityFilter(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {prStatusOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={cn(
+                'filter-chip',
+                prStatusFilter === opt.value && 'filter-chip-active',
+              )}
+              onClick={() => setPrStatusFilter(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative ml-auto">
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          <input
+            type="text"
+            placeholder="Search PRs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input-surface w-56 pl-8 text-[0.8rem]"
+          />
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className={sectionCardClass('p-8 text-center')}>
+          <AlertCircle size={32} className="mx-auto mb-3 text-[var(--severity-red-text)]" />
+          <p className="text-sm text-[var(--text-secondary)]">{error}</p>
+          <button type="button" className="button-surface button-accent mt-4" onClick={loadCards}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && filtered.length === 0 && (
+        <div className={sectionCardClass('p-12 text-center')}>
+          <GitPullRequest size={40} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">No PRs yet</h3>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            When Truffles detects issues and creates fixes, they'll show up here.
+          </p>
+        </div>
+      )}
+
+      {/* Card grid */}
+      {!loading && !error && filtered.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((card) => (
+            <div
+              key={card.issueId}
+              className={sectionCardClass('tr-card-interactive flex flex-col overflow-hidden')}
+            >
+              {/* Hero image */}
+              {card.screenshotUrl ? (
+                <img
+                  src={card.screenshotUrl}
+                  alt={card.issueTitle}
+                  className="dashboard-card-hero"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div
+                className={cn(
+                  'dashboard-card-hero-placeholder',
+                  card.screenshotUrl ? 'hidden' : undefined,
+                )}
+              >
+                <GitPullRequest size={28} className="text-[var(--text-tertiary)]" />
+              </div>
+
+              {/* Card body */}
+              <div className="flex flex-1 flex-col gap-2.5 p-4">
+                {/* Badges */}
+                <div className="flex items-center gap-2">
+                  <span className={cn('severity-badge', `severity-badge-${card.severity}`)}>
+                    {card.severity.toUpperCase()}
+                  </span>
+                  <span
+                    className={cn(
+                      'chip',
+                      card.prStatus === 'merged' && 'chip-emerald',
+                      card.prStatus === 'open' && 'chip-amber',
+                      card.prStatus === 'closed' && 'chip-grey',
+                    )}
+                  >
+                    {card.prStatus === 'merged' ? 'Merged' : card.prStatus === 'open' ? 'Open' : 'Closed'}
+                  </span>
+                  <span className="ml-auto mono text-[0.68rem] text-[var(--text-tertiary)]">
+                    #{card.prNumber}
+                  </span>
+                </div>
+
+                {/* Title */}
+                <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]" title={card.issueTitle}>
+                  {card.issueTitle}
+                </h3>
+
+                {/* Description */}
+                <p className="line-clamp-2 text-[0.78rem] leading-relaxed text-[var(--text-secondary)]">
+                  {card.issueDescription}
+                </p>
+
+                {/* PR stats */}
+                <div className="mt-auto flex items-center gap-3 pt-1 text-[0.7rem]">
+                  <span className="text-[var(--severity-green-text)]">+{card.prAdditions}</span>
+                  <span className="text-[var(--severity-red-text)]">-{card.prDeletions}</span>
+                  <span className="text-[var(--text-tertiary)]">{card.prFilesChanged} files</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="button-surface flex-1 inline-flex items-center justify-center gap-1.5"
+                    onClick={() => navigate(`/sessions/${card.sessionId}?t=${card.timestampSec}`)}
+                  >
+                    <Video size={13} />
+                    Watch Replay
+                  </button>
+                  <a
+                    href={card.prHtmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="button-surface button-accent flex-1 inline-flex items-center justify-center gap-1.5"
+                  >
+                    <ExternalLink size={13} />
+                    View PR
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function WelcomePage() {
   return (
     <section className="animate-rise flex flex-col items-center justify-center gap-8 py-20">
       {/* Greeting + intro */}
       <div className="text-center max-w-lg">
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--brand-text)]">
-          {greeting}
+          Welcome!
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-[var(--text-secondary)]">
           Most bugs don't get reported. Users hit something broken, get annoyed, and
@@ -1037,6 +1265,34 @@ function SessionDetailPage() {
       return () => video.removeEventListener('loadedmetadata', handleSeekable);
     }
   }, [sessionDetail?.videoUrl, searchParams]);
+
+  // Auto-seek to a meaningful frame so the poster isn't black:
+  // prefer first issue timestamp, otherwise video midpoint.
+  // Skip if ?t= param already handled seeking.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || searchParams.get('t')) return;
+
+    const seek = () => {
+      if (video.currentTime > 0.5) return; // already seeked by something else
+      let target: number;
+      if (sessionIssues.length > 0) {
+        target = sessionIssues[0].timestampSec / 4; // session seconds → video seconds
+      } else {
+        target = video.duration / 2;
+      }
+      if (isFinite(target) && target > 0) {
+        video.currentTime = target;
+      }
+    };
+
+    if (video.readyState >= 1) {
+      seek();
+    } else {
+      video.addEventListener('loadedmetadata', seek, { once: true });
+      return () => video.removeEventListener('loadedmetadata', seek);
+    }
+  }, [sessionDetail?.videoUrl, sessionIssues, searchParams]);
 
   // Apply playback rate when speed changes
   useEffect(() => {
@@ -1844,6 +2100,35 @@ function IssueDetailPage() {
   );
 }
 
+function HistoryStatusBadge({ status }: { status: AgentPhase }) {
+  if (status === 'done') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--severity-green-border)] bg-[var(--severity-green-bg)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--severity-green-text)]">
+        <CheckCircle size={10} /> Done
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--severity-red-border)] bg-[var(--severity-red-bg)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--severity-red-text)]">
+        <AlertCircle size={10} /> Failed
+      </span>
+    );
+  }
+  if (status === 'false_alarm') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+        <CircleSlash size={10} /> False Alarm
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-soft)] bg-[var(--surface-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
+      {phaseLabel(status)}
+    </span>
+  );
+}
+
 function AgentsPage() {
   const [agents, setAgents] = useState<AgentSessionDoc[]>([]);
   const [stats, setStats] = useState({ maxConcurrent: 5, activeCount: 0, queuedCount: 0 });
@@ -1851,6 +2136,14 @@ function AgentsPage() {
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const { agentState } = useAgentWebSocket();
   const [runtimeTick, setRuntimeTick] = useState(0);
+
+  // History state
+  const [history, setHistory] = useState<AgentHistorySummary[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const HISTORY_PAGE_SIZE = 12;
 
   const loadAgents = useCallback(() => {
     setLoading(true);
@@ -1867,21 +2160,47 @@ function AgentsPage() {
       });
   }, []);
 
+  const loadHistory = useCallback((offset = 0, append = false) => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    fetchAgentHistory(HISTORY_PAGE_SIZE, offset)
+      .then((result) => {
+        setHistory((prev) => append ? [...prev, ...result.sessions] : result.sessions);
+        setHistoryTotal(result.total);
+        setHistoryHasMore(result.hasMore);
+        setHistoryLoading(false);
+      })
+      .catch((err) => {
+        setHistoryError(err instanceof Error ? err.message : 'Failed to load history');
+        setHistoryLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     loadAgents();
-  }, [loadAgents]);
+    loadHistory();
+  }, [loadAgents, loadHistory]);
 
   // Re-fetch when WebSocket indicates changes
   useEffect(() => {
     const agentIds = Object.keys(agentState);
     if (agentIds.length === 0) return;
+
     fetchAgentList()
       .then((result) => {
         setAgents(result.active);
         setStats(result.stats);
       })
       .catch(() => {});
-  }, [agentState]);
+
+    // A completed event means history changed — reload first page
+    const hasCompleted = Object.values(agentState).some(
+      (s) => s.status === 'done' || s.status === 'failed' || s.status === 'false_alarm',
+    );
+    if (hasCompleted) {
+      loadHistory();
+    }
+  }, [agentState, loadHistory]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -2007,6 +2326,98 @@ function AgentsPage() {
         {agents.length === 0 && (
           <div className={sectionCardClass('p-8 text-center')}>
             <p className="text-sm text-[var(--text-secondary)]">No active agents. Issues will be dispatched automatically after screening.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Agent History */}
+      <div className={sectionCardClass('space-y-5 p-5 sm:p-6')}>
+        <div>
+          <h2 className="flex items-center gap-2 text-[20px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+            <Clock3 size={18} className="text-[var(--text-tertiary)]" />
+            History
+          </h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            {historyTotal > 0 ? `${historyTotal} completed run${historyTotal !== 1 ? 's' : ''}` : 'Past agent runs will appear here.'}
+          </p>
+        </div>
+
+        {historyError && <ErrorState message={historyError} onRetry={() => loadHistory()} />}
+
+        {!historyError && history.length > 0 && (
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {history.map((session) => {
+              const runtimeSec = session.completedAt
+                ? Math.floor((new Date(session.completedAt).getTime() - new Date(session.startedAt).getTime()) / 1000)
+                : 0;
+
+              return (
+                <Link key={session._id} to={`/agents/${session._id}`} className={sectionCardClass('tr-card-interactive space-y-3 p-4')}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="mono text-[11px] uppercase tracking-[0.14em] text-[var(--text-tertiary)]">Agent #{session._id.slice(-6)}</p>
+                    <HistoryStatusBadge status={session.status} />
+                  </div>
+
+                  <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Issue: {session.issueId.slice(-8)}</h3>
+
+                  {session.prUrl && (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--severity-green-text)]">
+                      <GitPullRequest size={12} />
+                      PR #{session.prNumber}
+                    </span>
+                  )}
+                  {session.falseAlarmReason && (
+                    <p className="text-xs text-[var(--text-secondary)] line-clamp-2">{session.falseAlarmReason}</p>
+                  )}
+                  {session.error && session.status === 'failed' && (
+                    <p className="text-xs text-[var(--severity-red-text)] line-clamp-2">{session.error}</p>
+                  )}
+
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                    <span>{session.completedAt ? formatRelative(session.completedAt) : formatRelative(session.startedAt)}</span>
+                    <span className="mono text-[12px]">{formatDuration(Math.max(0, runtimeSec))}</span>
+                  </div>
+
+                  {session.filesModified.length > 0 && (
+                    <p className="mono text-[11px] text-[var(--text-tertiary)]">
+                      {session.filesModified.length} file{session.filesModified.length !== 1 ? 's' : ''} modified
+                    </p>
+                  )}
+
+                  {session.costUsd != null && (
+                    <p className="text-[11px] text-[var(--text-tertiary)]">Cost: ${session.costUsd.toFixed(2)}</p>
+                  )}
+
+                  <p className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.12em] text-[var(--accent-text)]">
+                    View output <ChevronRight size={12} />
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {!historyError && history.length === 0 && !historyLoading && (
+          <div className={sectionCardClass('p-8 text-center')}>
+            <p className="text-sm text-[var(--text-secondary)]">No completed agent runs yet.</p>
+          </div>
+        )}
+
+        {historyLoading && (
+          <div className="flex justify-center py-4">
+            <Loader2 size={18} className="animate-spin text-[var(--accent)]" />
+          </div>
+        )}
+
+        {historyHasMore && !historyLoading && (
+          <div className="flex justify-center">
+            <button
+              onClick={() => loadHistory(history.length, true)}
+              className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-4 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface)] hover:text-[var(--text-primary)]"
+            >
+              Load more
+              <ChevronDown size={14} />
+            </button>
           </div>
         )}
       </div>
@@ -2304,23 +2715,30 @@ function PRReviewPage() {
     };
   }, [sessionDetail?.videoUrl]);
 
-  // Auto-seek to issue timestamp on video load
+  // Auto-seek to issue timestamp (or midpoint) so poster frame isn't black
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || pr?.issueTimestampSec == null) return;
-    const seekSec = pr.issueTimestampSec;
+    if (!video) return;
 
-    const handleSeekable = () => {
-      video.currentTime = seekSec;
+    const seek = () => {
+      let target: number;
+      if (pr?.issueTimestampSec != null) {
+        target = pr.issueTimestampSec / 4;
+      } else {
+        target = video.duration / 2;
+      }
+      if (isFinite(target) && target > 0) {
+        video.currentTime = target;
+      }
       video.playbackRate = 0.25;
-      setCurrentTime(seekSec);
+      setCurrentTime(pr?.issueTimestampSec ?? 0);
     };
 
     if (video.readyState >= 1) {
-      handleSeekable();
+      seek();
     } else {
-      video.addEventListener('loadedmetadata', handleSeekable, { once: true });
-      return () => video.removeEventListener('loadedmetadata', handleSeekable);
+      video.addEventListener('loadedmetadata', seek, { once: true });
+      return () => video.removeEventListener('loadedmetadata', seek);
     }
   }, [sessionDetail?.videoUrl, pr?.issueTimestampSec]);
 
@@ -3080,6 +3498,7 @@ export function App() {
       <main className="mx-auto w-full max-w-[1480px] px-6 pb-12 pt-7 md:px-8">
         <Routes>
           <Route path="/" element={<Navigate to="/welcome" replace />} />
+          <Route path="/dashboard" element={<PRDashboardPage />} />
           <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/sessions/:id" element={<SessionDetailPage />} />
@@ -3089,7 +3508,7 @@ export function App() {
           <Route path="/agents/:id" element={<AgentDetailPage />} />
           <Route path="/prs/:id" element={<PRReviewPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<MissingState title="Page not found" backPath="/sessions" backLabel="Back to Sessions" />} />
+          <Route path="*" element={<MissingState title="Page not found" backPath="/dashboard" backLabel="Back to Dashboard" />} />
         </Routes>
       </main>
       <ToastContainer />

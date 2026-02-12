@@ -171,6 +171,7 @@ function buildReplayHtml(events: unknown[], config: Required<RenderConfig>): str
           speed: ${config.speed},
           skipInactive: false,
           autoPlay: false,
+          mouseTail: false,
           width: ${config.width},
           height: ${config.height},
         },

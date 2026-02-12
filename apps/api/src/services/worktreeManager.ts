@@ -25,13 +25,16 @@ export class WorktreeManager {
     const branchName = `truffles/fix-${shortId}`;
     const worktreePath = `${this.worktreeBasePath}/wt-${shortId}-${Date.now()}`;
 
+    // Clean up stale worktree/branch from a previous run of this issue
+    await this.cleanupBranch(branchName);
+
     await this.git('worktree', 'add', '-b', branchName, worktreePath, `origin/${this.defaultBranch}`);
 
     console.log(`[worktree] created: ${worktreePath} on branch ${branchName}`);
     return { worktreePath, branchName };
   }
 
-  async removeWorktree(worktreePath: string): Promise<void> {
+  async removeWorktree(worktreePath: string, branchName?: string): Promise<void> {
     try {
       await this.git('worktree', 'remove', '--force', worktreePath);
     } catch (err) {
@@ -48,6 +51,57 @@ export class WorktreeManager {
       await this.git('worktree', 'prune');
     } catch {
       // non-critical
+    }
+
+    // Delete the branch so retries can recreate it cleanly
+    if (branchName) {
+      try {
+        await this.git('branch', '-D', branchName);
+      } catch {
+        // branch may already be gone
+      }
+    }
+  }
+
+  /** Remove any existing worktree and local branch for a given branch name. */
+  private async cleanupBranch(branchName: string): Promise<void> {
+    // Find if this branch is checked out in an existing worktree
+    try {
+      const listOutput = await this.git('worktree', 'list', '--porcelain');
+      let currentWorktree = '';
+      for (const line of listOutput.split('\n')) {
+        if (line.startsWith('worktree ')) {
+          currentWorktree = line.slice('worktree '.length);
+        }
+        if (line.startsWith('branch ') && line.endsWith(`/${branchName}`)) {
+          // This worktree has our branch checked out — remove it
+          if (currentWorktree && currentWorktree !== this.repoClonePath) {
+            console.log(`[worktree] removing stale worktree for branch ${branchName}: ${currentWorktree}`);
+            try {
+              await this.git('worktree', 'remove', '--force', currentWorktree);
+            } catch {
+              await rm(currentWorktree, { recursive: true, force: true }).catch(() => {});
+            }
+          }
+          break;
+        }
+      }
+    } catch {
+      // worktree list can fail if no worktrees exist yet
+    }
+
+    try {
+      await this.git('worktree', 'prune');
+    } catch {
+      // non-critical
+    }
+
+    // Delete the local branch
+    try {
+      await this.git('branch', '-D', branchName);
+      console.log(`[worktree] deleted stale branch ${branchName}`);
+    } catch {
+      // branch doesn't exist — that's fine
     }
   }
 

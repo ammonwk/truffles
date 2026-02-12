@@ -2,6 +2,10 @@ import { PostHogSessionCache } from '@truffles/db';
 import type { PostHogSyncResult } from '@truffles/shared';
 import { gunzipSync, strFromU8, strToU8 } from 'fflate';
 import { fetchWithRetry } from './fetchWithRetry.js';
+import { Semaphore } from './semaphore.js';
+
+// Limit concurrent PostHog API calls across all sessions to avoid 429s.
+const posthogSemaphore = new Semaphore(3);
 
 interface PostHogRecordingResult {
   id: string;
@@ -71,9 +75,11 @@ export async function syncPostHogSessions(): Promise<PostHogSyncResult> {
       params.set('properties', properties);
 
       const url = `${host}/api/environments/${projectId}/session_recordings?${params.toString()}`;
-      const response = await fetchWithRetry(url, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
+      const response = await posthogSemaphore.run(() =>
+        fetchWithRetry(url, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        }),
+      );
 
       if (!response.ok) {
         const text = await response.text();
@@ -145,9 +151,11 @@ export async function getSessionSnapshots(
 
   // First, get the snapshot sources (PostHog v2 uses /api/environments/ path)
   const sourcesUrl = `${host}/api/environments/${projectId}/session_recordings/${sessionId}/snapshots`;
-  const sourcesResponse = await fetchWithRetry(sourcesUrl, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  const sourcesResponse = await posthogSemaphore.run(() =>
+    fetchWithRetry(sourcesUrl, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    }),
+  );
 
   if (!sourcesResponse.ok) {
     const text = await sourcesResponse.text();
@@ -157,18 +165,56 @@ export async function getSessionSnapshots(
   const sourcesData = (await sourcesResponse.json()) as PostHogSnapshotResponse;
   console.log(`[posthog] Snapshot sources for ${sessionId}:`, JSON.stringify(sourcesData.sources));
 
-  // Fetch each blob source
-  const allEvents: RRWebEvent[] = [];
+  // Group sources by type and batch blob key ranges to reduce API calls.
+  const sourceGroups = new Map<string, number[]>();
+  const nonNumericSources: Array<{ source: string; blob_key: string | number }> = [];
 
   for (const source of sourcesData.sources) {
     if (source.blob_key === undefined || source.blob_key === null) continue;
+    const numKey = Number(source.blob_key);
+    if (Number.isNaN(numKey)) {
+      nonNumericSources.push({ source: source.source, blob_key: source.blob_key! });
+      continue;
+    }
+    const keys = sourceGroups.get(source.source) ?? [];
+    keys.push(numKey);
+    sourceGroups.set(source.source, keys);
+  }
 
+  const allEvents: RRWebEvent[] = [];
+
+  // Fetch each source type as a single ranged request
+  for (const [sourceType, keys] of sourceGroups) {
+    const minKey = Math.min(...keys);
+    const maxKey = Math.max(...keys);
+    const blobUrl = `${sourcesUrl}?source=${encodeURIComponent(sourceType)}&start_blob_key=${minKey}&end_blob_key=${maxKey}`;
+    console.log(`[posthog] Fetching blobs ${minKey}-${maxKey} (${keys.length} blobs) for ${sourceType}`);
+    const blobResponse = await posthogSemaphore.run(() =>
+      fetchWithRetry(blobUrl, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }),
+    );
+
+    if (!blobResponse.ok) {
+      const errorText = await blobResponse.text().catch(() => '');
+      console.warn(`Failed to fetch blobs ${minKey}-${maxKey}: ${blobResponse.status} ${errorText}`);
+      continue;
+    }
+
+    const text = await blobResponse.text();
+    allEvents.push(...convertPostHogSnapshotsToRRWeb(text));
+  }
+
+  // Fallback: fetch any non-numeric blob keys individually
+  for (const source of nonNumericSources) {
     const key = encodeURIComponent(String(source.blob_key));
     const blobUrl = `${sourcesUrl}?source=${encodeURIComponent(source.source)}&start_blob_key=${key}&end_blob_key=${key}`;
     console.log(`[posthog] Fetching blob: ${blobUrl}`);
-    const blobResponse = await fetchWithRetry(blobUrl, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const blobResponse = await posthogSemaphore.run(() =>
+      fetchWithRetry(blobUrl, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }),
+    );
 
     if (!blobResponse.ok) {
       const errorText = await blobResponse.text().catch(() => '');
@@ -177,8 +223,7 @@ export async function getSessionSnapshots(
     }
 
     const text = await blobResponse.text();
-    const events = convertPostHogSnapshotsToRRWeb(text);
-    allEvents.push(...events);
+    allEvents.push(...convertPostHogSnapshotsToRRWeb(text));
   }
 
   if (allEvents.length === 0) {
@@ -310,9 +355,11 @@ export async function getSessionMetadata(sessionId: string): Promise<{
 }> {
   const { apiKey, projectId, host } = getPostHogConfig();
   const url = `${host}/api/environments/${projectId}/session_recordings/${sessionId}`;
-  const response = await fetchWithRetry(url, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  const response = await posthogSemaphore.run(() =>
+    fetchWithRetry(url, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    }),
+  );
 
   if (!response.ok) {
     const text = await response.text();

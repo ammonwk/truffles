@@ -1,6 +1,6 @@
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
-const MAX_DELAY_MS = 30_000;
+const MAX_DELAY_MS = 300_000;
 const JITTER_FACTOR = 0.2;
 
 function isRetryable(status: number): boolean {

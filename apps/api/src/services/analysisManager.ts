@@ -45,8 +45,8 @@ export class AnalysisManager {
           ? analyzeSessionVideo(videoS3Key, durationSec, {
               primary: settings.videoModelPrimary,
               secondary: settings.videoModelSecondary,
-            })
-          : Promise.resolve({ primary: { issues: [] as DetectedIssue[], model: '', durationMs: 0 }, secondary: { issues: [] as DetectedIssue[], model: '', durationMs: 0 } }),
+            }, session._id.toString())
+          : Promise.resolve({ primary: { issues: [] as DetectedIssue[], model: '', durationMs: 0 }, secondary: { issues: [] as DetectedIssue[], model: '', durationMs: 0 }, frameUrls: new Map<number, string>() }),
         analyzeSessionData(
           consoleErrors,
           networkFailures,
@@ -59,6 +59,9 @@ export class AnalysisManager {
         `[analysis] video analysis found ${videoResult.primary.issues.length} (primary) + ${videoResult.secondary.issues.length} (secondary) issues, ` +
         `data analysis found ${dataResult.issues.length} issues`,
       );
+
+      // Build frameIndex → URL lookup from uploaded frames
+      const frameUrls = videoResult.frameUrls ?? new Map<number, string>();
 
       // Tag issues with source
       const videoIssues = [
@@ -116,6 +119,7 @@ export class AnalysisManager {
       const sessionId = session._id;
       const issuePromises = screeningResult.kept.map(async (keptIssue) => {
         const matchedMerged = mergeResult.unique.find((m) => m.title === keptIssue.title);
+        const screenshotUrl = keptIssue.frameIndex != null ? frameUrls.get(keptIssue.frameIndex) : undefined;
         return Issue.create({
           sessionId,
           posthogSessionId,
@@ -129,12 +133,14 @@ export class AnalysisManager {
           screeningReasoning: keptIssue.screeningReasoning,
           detectedBy: matchedMerged?.source ?? 'unknown',
           screenedBy: screeningResult.model,
+          videoFrameUrls: screenshotUrl ? [screenshotUrl] : [],
         });
       });
 
       // Also save dropped issues as false_alarm for reference
       const droppedPromises = screeningResult.dropped.map(async (droppedIssue) => {
         const matchedMerged = mergeResult.unique.find((m) => m.title === droppedIssue.title);
+        const screenshotUrl = droppedIssue.frameIndex != null ? frameUrls.get(droppedIssue.frameIndex) : undefined;
         return Issue.create({
           sessionId,
           posthogSessionId,
@@ -149,6 +155,7 @@ export class AnalysisManager {
           falseAlarmReason: droppedIssue.dropReason,
           detectedBy: matchedMerged?.source ?? 'unknown',
           screenedBy: screeningResult.model,
+          videoFrameUrls: screenshotUrl ? [screenshotUrl] : [],
         });
       });
 
@@ -174,11 +181,13 @@ export class AnalysisManager {
       if (this.agentManager && keptIssues.length > 0) {
         for (const issueDocs of keptIssues) {
           try {
+            const issueFrameUrls = (issueDocs.videoFrameUrls as string[] | undefined) ?? [];
             await this.agentManager.startAgent({
               issueId: issueDocs._id.toString(),
               issueTitle: issueDocs.title,
               issueDescription: issueDocs.description,
               severity: issueDocs.severity as 'red' | 'yellow',
+              screenshotUrl: issueFrameUrls[0],
               sessionContext: {
                 consoleErrors: consoleErrors.slice(0, 10),
                 networkFailures: networkFailures.slice(0, 10),

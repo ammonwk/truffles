@@ -7,11 +7,13 @@ import type {
   IssueListResponse,
   IssueDetail,
   AgentListResponse,
+  AgentHistoryResponse,
   AgentSessionDoc,
   SettingsResponse,
   SettingsUpdateRequest,
   SuppressionRuleListResponse,
   SuppressionRuleDoc,
+  DashboardResponse,
 } from '@truffles/shared';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -25,14 +27,6 @@ function adminHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${getAdminPassword()}`,
   };
-}
-
-// --- Identity (local network) ---
-
-export async function fetchIdentity(): Promise<{ name: string | null; role: string | null }> {
-  const res = await fetch(`/api/identify`);
-  const data = await res.json();
-  return data;
 }
 
 // --- Sessions (existing) ---
@@ -195,6 +189,12 @@ export async function fetchAgentDetail(id: string): Promise<AgentSessionDoc> {
   return res.json();
 }
 
+export async function fetchAgentHistory(limit = 20, offset = 0): Promise<AgentHistoryResponse> {
+  const res = await fetch(`${API_BASE}/api/agents/history?limit=${limit}&offset=${offset}`);
+  if (!res.ok) throw new Error(`Failed to fetch agent history: ${res.status}`);
+  return res.json();
+}
+
 export async function startAgent(request: {
   issueId: string;
   issueTitle: string;
@@ -310,6 +310,22 @@ export async function clearAllData(): Promise<void> {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Failed to clear data: ${res.status}`);
   }
+}
+
+// --- Dashboard ---
+
+export async function fetchDashboardPRs(params?: {
+  severity?: string;
+  prStatus?: string;
+}): Promise<DashboardResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.severity && params.severity !== 'all') searchParams.set('severity', params.severity);
+  if (params?.prStatus && params.prStatus !== 'all') searchParams.set('prStatus', params.prStatus);
+
+  const query = searchParams.toString();
+  const res = await fetch(`${API_BASE}/api/dashboard/prs${query ? `?${query}` : ''}`);
+  if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
+  return res.json();
 }
 
 // --- PRs ---

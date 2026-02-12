@@ -11,6 +11,7 @@ export interface AgentStartRequest {
   issueTitle: string;
   issueDescription: string;
   severity: Severity;
+  screenshotUrl?: string;
   sessionContext?: {
     consoleErrors?: string[];
     networkFailures?: string[];
@@ -66,4 +67,27 @@ export interface AgentListResponse {
   active: AgentSessionDoc[];
   queued: string[];
   stats: { maxConcurrent: number; activeCount: number; queuedCount: number };
+}
+
+// --- Agent history (completed sessions) ---
+
+export interface AgentHistorySummary {
+  _id: string;
+  issueId: string;
+  status: AgentPhase;
+  branchName: string;
+  startedAt: string;
+  completedAt?: string;
+  filesModified: string[];
+  error?: string;
+  prNumber?: number;
+  prUrl?: string;
+  falseAlarmReason?: string;
+  costUsd?: number;
+}
+
+export interface AgentHistoryResponse {
+  sessions: AgentHistorySummary[];
+  total: number;
+  hasMore: boolean;
 }
