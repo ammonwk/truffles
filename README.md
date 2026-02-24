@@ -177,4 +177,4 @@ npm run typecheck    # TypeScript check everything
 
 ## License
 
-Internal hackathon project. Not licensed for external use.
+MIT — see [LICENSE](LICENSE).

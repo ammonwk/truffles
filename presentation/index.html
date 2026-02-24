@@ -539,7 +539,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 3rem 5rem;
+      padding: 3rem 6rem;
       opacity: 0;
       transform: translateY(8px) scale(0.985);
       transition: opacity 0.45s ease, transform 0.45s ease;
@@ -555,7 +555,7 @@
     }
 
     .slide-inner {
-      max-width: 960px;
+      max-width: 1400px;
       width: 100%;
     }
 
@@ -579,27 +579,38 @@
       font-size: 1.05rem;
     }
 
-    /* Slide type: section — tighten spacing */
-    .slide-section h2 { margin-bottom: 0.75rem; }
+    /* Slide type: section — scale up for projection */
+    .slide-section .section-label { font-size: 0.85rem; letter-spacing: 0.12em; margin-bottom: 1.25rem; }
+    .slide-section h2 { font-size: 2.5rem; margin-bottom: 1rem; }
+    .slide-section p.body,
+    .slide-section p.lead { font-size: 1.4rem; max-width: 1000px; line-height: 1.8; }
     .slide-section .card-grid,
     .slide-section .connection-grid {
-      margin-top: 1.5rem;
+      margin-top: 2rem;
     }
+    .slide-section .card h3 { font-size: 1.3rem; }
+    .slide-section .card p { font-size: 1.05rem; line-height: 1.7; }
+    .slide-section .card .icon { font-size: 1.75rem; }
     .slide-section .tech-grid {
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 0.75rem;
-      margin-top: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
     }
-    .slide-section .tech-item { padding: 1rem; }
-    .slide-section .arch-flow { margin-top: 1.25rem; padding: 2rem; }
-    .slide-section .learnings { margin-top: 1.25rem; gap: 1rem; }
-    .slide-section .learning-item h3 { font-size: 0.95rem; }
-    .slide-section .learning-item p { font-size: 0.85rem; }
+    .slide-section .tech-item { padding: 1.25rem; }
+    .slide-section .tech-item .value { font-size: 1.05rem; }
+    .slide-section .tech-item .detail { font-size: 0.9rem; }
+    .slide-section .arch-flow { margin-top: 1.5rem; padding: 2.5rem; }
+    .slide-section .arch-flow pre { font-size: 0.85rem; }
+    .slide-section .learnings { margin-top: 1.5rem; gap: 1.25rem; }
+    .slide-section .learning-item h3 { font-size: 1.15rem; }
+    .slide-section .learning-item p { font-size: 1rem; line-height: 1.7; }
+    .slide-section .connection-card h3 { font-size: 1.2rem; }
+    .slide-section .connection-card p { font-size: 1rem; line-height: 1.7; }
 
     /* Slide type: pipeline step */
-    .slide-step .slide-inner { max-width: 1000px; }
+    .slide-step .slide-inner { max-width: 1400px; }
     .slide-step .step-label {
-      font-size: 0.7rem;
+      font-size: 0.85rem;
       font-weight: 600;
       letter-spacing: 0.1em;
       text-transform: uppercase;
@@ -608,14 +619,14 @@
       transition: color 0.4s ease;
     }
     .slide-step h2 {
-      font-size: 1.6rem;
+      font-size: 2.25rem;
       margin-bottom: 0.5rem;
     }
     .slide-step p {
       color: var(--text-muted);
-      font-size: 0.95rem;
+      font-size: 1.2rem;
       line-height: 1.7;
-      max-width: 720px;
+      max-width: 900px;
       margin-bottom: 1.25rem;
       transition: color 0.4s ease;
     }
@@ -766,6 +777,113 @@
       .present-btn { display: none; }
       .slideshow-slide { padding: 2rem 1.5rem; }
       .slideshow-nav { display: none; }
+      .flow-pipeline { flex-direction: column; align-items: center; gap: 0.75rem; }
+      .flow-connector { transform: rotate(90deg); }
+      .connection-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Condensed pipeline flow ── */
+    .flow-pipeline {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      margin-top: 2rem;
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+    .flow-node {
+      flex: 1;
+      min-width: 120px;
+      text-align: center;
+      padding: 0 0.25rem;
+    }
+    .flow-node .flow-num {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--accent-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin: 0 auto 0.75rem;
+      transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+    }
+    .flow-node .flow-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+      color: var(--text);
+      transition: color 0.4s ease;
+    }
+    .flow-node .flow-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      transition: color 0.4s ease;
+    }
+    .flow-connector {
+      display: flex;
+      align-items: center;
+      padding-top: 0.85rem;
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      transition: color 0.4s ease;
+    }
+
+    /* ── Break section ── */
+    .break-section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+    .break-section h2 {
+      font-size: 1.5rem;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--text-dim);
+      letter-spacing: -0.01em;
+      transition: color 0.4s ease;
+    }
+    .break-section .break-line {
+      width: 4rem;
+      height: 2px;
+      background: var(--border);
+      margin: 1.5rem auto;
+      transition: background 0.4s ease;
+    }
+
+    /* Slide type: break */
+    .slide-break .slide-inner {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .slide-break h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--text-dim);
+    }
+
+    /* Slideshow section tweaks for new sections */
+    .slide-section .flow-pipeline { margin-top: 2rem; }
+    .slide-section .flow-node .flow-title { font-size: 1.15rem; }
+    .slide-section .flow-node .flow-desc { font-size: 0.95rem; }
+    .slide-section .flow-node .flow-num { width: 3.25rem; height: 3.25rem; font-size: 1.1rem; }
+    .slide-section .flow-connector { font-size: 1.4rem; }
+    .slide-section .screenshot img {
+      max-height: 55vh;
+      width: 100%;
+      object-fit: contain;
+      object-position: top left;
     }
   </style>
 </head>
@@ -847,6 +965,70 @@
 </section>
 
 <div class="divider"><hr></div>
+
+<!-- How It Works (condensed) -->
+<section id="how-overview">
+  <div class="section-label">How It Works</div>
+  <h2>Five steps, fully automated</h2>
+  <p class="body" style="margin-bottom: 0.5rem;">
+    PostHog sessions flow through a rendering and analysis pipeline. Issues that survive
+    screening are handed to a coding agent that opens a PR.
+  </p>
+  <div class="flow-pipeline">
+    <div class="flow-node">
+      <div class="flow-num">1</div>
+      <div class="flow-title">Ingest</div>
+      <div class="flow-desc">Pull sessions from PostHog</div>
+    </div>
+    <div class="flow-connector">&rarr;</div>
+    <div class="flow-node">
+      <div class="flow-num">2</div>
+      <div class="flow-title">Render</div>
+      <div class="flow-desc">rrweb events &rarr; MP4 video</div>
+    </div>
+    <div class="flow-connector">&rarr;</div>
+    <div class="flow-node">
+      <div class="flow-num">3</div>
+      <div class="flow-title">Analyze</div>
+      <div class="flow-desc">Dual-model vision AI</div>
+    </div>
+    <div class="flow-connector">&rarr;</div>
+    <div class="flow-node">
+      <div class="flow-num">4</div>
+      <div class="flow-title">Screen</div>
+      <div class="flow-desc">Deduplicate &amp; filter noise</div>
+    </div>
+    <div class="flow-connector">&rarr;</div>
+    <div class="flow-node">
+      <div class="flow-num">5</div>
+      <div class="flow-title">Fix</div>
+      <div class="flow-desc">Claude Code agent &rarr; GitHub PR</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><hr></div>
+
+<!-- The Result -->
+<section id="result">
+  <div class="section-label">The Result</div>
+  <h2>Automated PRs with full context</h2>
+  <p class="body" style="margin-bottom: 1.5rem;">
+    Successful agents create pull requests linking back to the original session recording
+    and issue. A human reviews and merges.
+  </p>
+  <div class="screenshot">
+    <img class="img-dark" src="screenshots/dashboard-dark.png" alt="Dashboard (dark)">
+    <img class="img-light" src="screenshots/dashboard-light.png" alt="Dashboard (light)">
+  </div>
+</section>
+
+<!-- If we have time -->
+<div class="break-section">
+  <div class="break-line"></div>
+  <h2>Questions?</h2>
+  <div class="break-line"></div>
+</div>
 
 <!-- Architecture -->
 <section id="architecture">
@@ -1213,9 +1395,15 @@
 
     enter() {
       const sources = [
+        // Core presentation (~2 min)
         { el: document.querySelector('#hero'), type: 'hero' },
         { el: document.querySelector('#problem'), type: 'section' },
         { el: document.querySelector('#what'), type: 'section' },
+        { el: document.querySelector('#how-overview'), type: 'section' },
+        { el: document.querySelector('#result'), type: 'section' },
+        // Divider
+        { el: null, type: 'break' },
+        // Deep dive (if time permits)
         { el: document.querySelector('#architecture'), type: 'section' },
         ...Array.from(document.querySelectorAll('#pipeline .pipeline-step')).map(el => ({ el, type: 'step' })),
         { el: document.querySelector('#tech'), type: 'section' },
@@ -1236,7 +1424,9 @@
         const inner = document.createElement('div');
         inner.className = 'slide-inner';
 
-        if (src.type === 'step') {
+        if (src.type === 'break') {
+          inner.innerHTML = '<h1>Questions?</h1>';
+        } else if (src.type === 'step') {
           const stepNum = src.el.querySelector('.step-number').textContent.trim();
           const stepContent = src.el.querySelector('.step-content');
           const clone = stepContent.cloneNode(true);
